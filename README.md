@@ -18,40 +18,23 @@ ComfyUI
 `compat/` is the only import boundary for the ComfyUI API. Node adapters belong
 in `nodes/`; feature logic should remain independent of concrete node classes;
 
-Node registration is explicit in `sinyuk_nodes/registry.py`. Directory scanning,
-reflection-based discovery, and legacy `NODE_CLASS_MAPPINGS` registration are not
-used.
+Node registration is explicit in `sinyuk_nodes/registry.py`. The project
+supports the ComfyUI V3 API only.
 
-## Development 
+## Development
 
-The repository does not install ComfyUI itself. The ComfyUI checkout supplies
-the V3 API and runtime packages such as PyTorch. Run quality checks with the
-same Python environment that runs ComfyUI, and point both `COMFYUI_PATH` and
-`PYTHONPATH` at that checkout:
+Run checks with the same environment that runs ComfyUI:
 
 ```bash
-export COMFYUI_PATH=/path/to/ComfyUI
+export COMFYUI_PATH=/Users/sinyuk/AIGC/ComfyUI
 export PYTHONPATH="$COMFYUI_PATH:$PWD"
+export PYTHON=/Users/sinyuk/AIGC/ComfyUI/.venv/bin/python
 
-"$PYTHON" -m pip install -r requirements-dev.txt -r requirements.txt
+"$PYTHON" -m pytest -q
 "$PYTHON" -m ruff check .
 "$PYTHON" -m ruff format --check .
 "$PYTHON" -m pyright
-"$PYTHON" -m pytest
 ```
 
-If ComfyUI is installed into another environment, replace the `PYTHON` value
-with that environment's interpreter. Do not commit a machine-specific
-ComfyUI path; `COMFYUI_PATH` is intentionally supplied by each checkout or CI
-job.
-
-```bash
-COMFYUI_PATH=/path/to/ComfyUI \
-PYTHONPATH=/path/to/ComfyUI:$PWD \
-/path/to/ComfyUI/.venv/bin/python -m pytest
-```
-
-Published node IDs are workflow compatibility contracts and must remain stable.
-Changes to node schemas, inputs, outputs, or behavior should be documented in
-the repository's canonical documentation when that durable information is
-needed.
+ComfyUI is not installed by this repository; its checkout supplies the V3
+API and runtime packages.

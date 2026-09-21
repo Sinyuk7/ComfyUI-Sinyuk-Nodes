@@ -96,6 +96,13 @@ class OpenAPIConfigNode(io.ComfyNode):
         api_modes = {"Responses API": "responses", "Chat Completions": "chat_completions"}
         normalized_mode = api_modes.get(api_mode, api_mode)
         config = build_config(api_key, base_url, model_input, model_selection, (), normalized_mode)
+
+        # A manually entered model is authoritative.  Do not probe ``/models``
+        # in that case: OpenAI-compatible relay services commonly implement
+        # completions but intentionally omit the catalog endpoint.
+        if config.model_input.strip():
+            return io.NodeOutput(config)
+
         models = available_models(config.base_url)
         if models:
             config = build_config(

@@ -1,6 +1,20 @@
 Before modifying Python code, read and follow:
 - docs/standards/python.md
 
+## Local Validation Environment
+
+Use the ComfyUI checkout's virtual environment for local tests and quality
+checks. This repository depends on ComfyUI's runtime packages and V3 API:
+
+```bash
+export COMFYUI_PATH=/Users/sinyuk/AIGC/ComfyUI
+export PYTHONPATH="$COMFYUI_PATH:$PWD"
+export PYTHON=/Users/sinyuk/AIGC/ComfyUI/.venv/bin/python
+```
+
+Run checks with `"$PYTHON" -m pytest`, `"$PYTHON" -m ruff`, and
+`"$PYTHON" -m pyright`.
+
 ## Minimal Change Policy
 
 Keep this repository small, focused, and inexpensive to maintain.
@@ -127,4 +141,3 @@ Before adding a node, module, abstraction, or shared utility, determine:
 5. Is the proposed shared code already needed by multiple independent consumers?
 
 If ownership is unclear, do not add the new structure until the responsibility is clarified.
-

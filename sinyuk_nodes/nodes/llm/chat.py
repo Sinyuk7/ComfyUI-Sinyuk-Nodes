@@ -125,7 +125,12 @@ class LLMAPINode(io.ComfyNode):
             outputs=[
                 io.String.Output(
                     "response", display_name="Response", tooltip="Text returned by the model."
-                )
+                ),
+                io.String.Output(
+                    "execution_summary",
+                    display_name="Execution Summary",
+                    tooltip="Compact node-side request and response diagnostics.",
+                ),
             ],
         )
 
@@ -147,7 +152,7 @@ class LLMAPINode(io.ComfyNode):
         if not isinstance(api_config, OpenAPIConfig):
             raise ValueError("Connect an API Config node.")
         response_format = _RESPONSE_FORMAT_VALUES.get(response_format, response_format)
-        response = await execute_chat(
+        result = await execute_chat(
             api_config,
             system_prompt,
             prompt,
@@ -160,7 +165,7 @@ class LLMAPINode(io.ComfyNode):
             json_schema,
             image_detail,
         )
-        return io.NodeOutput(response)
+        return io.NodeOutput(result.response, result.execution_summary)
 
 
 __all__ = ["LLMAPINode"]

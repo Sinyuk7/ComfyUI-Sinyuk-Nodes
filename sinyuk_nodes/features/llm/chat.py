@@ -5,6 +5,8 @@ from __future__ import annotations
 import hashlib
 import json
 from collections import OrderedDict
+from dataclasses import dataclass
+from time import perf_counter
 
 import torch
 
@@ -15,6 +17,36 @@ from .schema import JSONSchemaDocument
 
 _RESPONSE_CACHE: OrderedDict[str, str] = OrderedDict()
 _CACHE_LIMIT = 128
+
+
+@dataclass(frozen=True)
+class ChatResult:
+    """Model output and a compact node-side execution summary."""
+
+    response: str
+    execution_summary: str
+
+
+def _execution_summary(
+    config: OpenAPIConfig,
+    response_format: str,
+    json_schema: JSONSchemaDocument | None,
+    image_count: int,
+    image_detail: str,
+    max_tokens: int | None,
+    cache: str,
+    elapsed_ms: int,
+    response: str,
+) -> str:
+    api = "resp" if config.api_mode == "responses" else "chat"
+    fmt = "js" if response_format == "json_schema" else "text"
+    schema_name = json_schema.name if json_schema is not None else "-"
+    token_limit = str(max_tokens) if max_tokens is not None else "-"
+    return (
+        f"api={api} mdl={config.model} fmt={fmt} sch={schema_name} "
+        f"img={image_count} det={image_detail} max={token_limit} "
+        f"cache={cache} ms={elapsed_ms} out={len(response)}"
+    )
 
 
 def _content_text(value: object) -> str:
@@ -178,7 +210,8 @@ async def execute_chat(
     response_format: str = "text",
     json_schema: JSONSchemaDocument | None = None,
     image_detail: str = "high",
-) -> str:
+) -> ChatResult:
+    started = perf_counter()
     encoded = encode_images(images, image_detail)
     payload_builder = build_responses_payload if config.api_mode == "responses" else build_payload
     payload = payload_builder(
@@ -219,7 +252,21 @@ async def execute_chat(
     ).hexdigest()
     if fingerprint in _RESPONSE_CACHE:
         _RESPONSE_CACHE.move_to_end(fingerprint)
-        return _RESPONSE_CACHE[fingerprint]
+        response = _RESPONSE_CACHE[fingerprint]
+        return ChatResult(
+            response,
+            _execution_summary(
+                config,
+                response_format,
+                json_schema,
+                len(encoded),
+                image_detail,
+                max_tokens,
+                "hit",
+                round((perf_counter() - started) * 1000),
+                response,
+            ),
+        )
     if config.api_mode == "responses":
         result = _responses_text(await complete_response(config.base_url, config.api_key, payload))
     else:
@@ -228,7 +275,20 @@ async def execute_chat(
     _RESPONSE_CACHE.move_to_end(fingerprint)
     while len(_RESPONSE_CACHE) > _CACHE_LIMIT:
         _RESPONSE_CACHE.popitem(last=False)
-    return result
+    return ChatResult(
+        result,
+        _execution_summary(
+            config,
+            response_format,
+            json_schema,
+            len(encoded),
+            image_detail,
+            max_tokens,
+            "miss",
+            round((perf_counter() - started) * 1000),
+            result,
+        ),
+    )
 
 
-__all__ = ["build_payload", "build_responses_payload", "execute_chat"]
+__all__ = ["ChatResult", "build_payload", "build_responses_payload", "execute_chat"]

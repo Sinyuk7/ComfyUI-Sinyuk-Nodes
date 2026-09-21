@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 from sinyuk_nodes.features.llm.chat import (
+    _execution_summary,
     _response_text,
     _responses_text,
     build_payload,
@@ -190,3 +191,14 @@ def test_json_schema_requires_connection_for_structured_output() -> None:
     )
     with pytest.raises(ValueError, match="Connect a JSON Schema"):
         build_payload(config, "", "Reply.", (), response_format="json_schema")
+
+
+def test_execution_summary_is_compact_and_machine_readable() -> None:
+    config = build_config(
+        "secret", "https://example.test/v1", "", "listed-model", ("listed-model",)
+    )
+    summary = _execution_summary(config, "json_schema", _SCHEMA, 4, "high", 2048, "miss", 123, "{}")
+    assert summary == (
+        "api=resp mdl=listed-model fmt=js sch=status_result img=4 det=high "
+        "max=2048 cache=miss ms=123 out=2"
+    )
