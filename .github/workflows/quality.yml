@@ -1,0 +1,35 @@
+name: Quality
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    env:
+      COMFYUI_PATH: ${{ github.workspace }}/ComfyUI
+      PYTHONPATH: ${{ github.workspace }}/ComfyUI
+    steps:
+      - uses: actions/checkout@v4
+      - name: Checkout ComfyUI V3 API source
+        uses: actions/checkout@v4
+        with:
+          repository: Comfy-Org/ComfyUI
+          path: ComfyUI
+          fetch-depth: 1
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install development tools
+        run: python -m pip install -r requirements-dev.txt
+      - name: Compile Python
+        run: python -m compileall -q sinyuk_nodes tests
+      - name: Ruff lint
+        run: ruff check .
+      - name: Ruff format
+        run: ruff format --check .
+      - name: Pyright
+        run: pyright
+      - name: Tests
+        run: pytest

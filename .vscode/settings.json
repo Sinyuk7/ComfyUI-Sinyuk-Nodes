@@ -1,0 +1,12 @@
+{
+  "python.defaultInterpreterPath": "/Users/sinyuk/AIGC/ComfyUI/.venv/bin/python",
+  "python.analysis.extraPaths": [
+    "/Users/sinyuk/AIGC/ComfyUI"
+  ],
+  "python.analysis.typeCheckingMode": "strict",
+  "python.testing.pytestEnabled": true,
+  "python.testing.pytestArgs": [
+    "tests"
+  ],
+  "python.testing.cwd": "${workspaceFolder}"
+}

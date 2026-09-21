@@ -1,0 +1,55 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "comfyui-sinyuk-nodes"
+version = "0.1.0"
+description = "Sinyuk's ComfyUI V3 custom node extension."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "GPL-3.0-only"
+authors = [{ name = "Sinyuk" }]
+dependencies = []
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+
+[project.urls]
+Repository = "https://github.com/Sinyuk7/ComfyUI-Sinyuk-Nodes"
+Issues = "https://github.com/Sinyuk7/ComfyUI-Sinyuk-Nodes/issues"
+
+[tool.comfy]
+PublisherId = "Sinyuk7"
+DisplayName = "Sinyuk Nodes"
+requires-comfyui = ">=0.0.2"
+
+[tool.setuptools.packages.find]
+include = ["sinyuk_nodes*"]
+
+[tool.pyright]
+include = ["sinyuk_nodes"]
+exclude = [".venv", "build", "dist"]
+pythonVersion = "3.11"
+typeCheckingMode = "strict"
+reportMissingTypeStubs = "none"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["-ra", "--strict-config", "--strict-markers"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+src = ["sinyuk_nodes", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
