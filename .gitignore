@@ -218,5 +218,6 @@ __marimo__/
 .streamlit/secrets.toml
 
 
-sinyuk_nodes/.DS_Store
 test_data
+
+.DS_Store

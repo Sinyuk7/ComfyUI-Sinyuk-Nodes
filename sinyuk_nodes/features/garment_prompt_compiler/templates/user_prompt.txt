@@ -1,0 +1,9 @@
+
+Analyze the provided images for high-fidelity outfit replacement.
+
+Image 1 is the base subject.
+Images 2 and onward are target outfit references.
+
+Identify the subject context, outfit item grouping, main and detail references, shape, fabric behavior, must-preserve regions, useful key details, and pose-aware presentation.
+
+Focus only on information that will materially improve reconstruction quality. Keep the analysis concise, accurate, and non-speculative.
