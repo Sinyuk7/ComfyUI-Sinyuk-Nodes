@@ -7,9 +7,11 @@ their classes from this module instead of relying on import-time discovery.
 from __future__ import annotations
 
 from .compat.comfy import io
+from .nodes.api_config import OpenAPIConfigNode
+from .nodes.llm_api import LLMAPINode
 
-# The initial scaffold intentionally exposes no nodes.
-ALL_NODES: list[type[io.ComfyNode]] = []
+# Keep registration explicit so the published node surface remains reviewable.
+ALL_NODES: list[type[io.ComfyNode]] = [OpenAPIConfigNode, LLMAPINode]
 
 
 def get_node_list() -> list[type[io.ComfyNode]]:

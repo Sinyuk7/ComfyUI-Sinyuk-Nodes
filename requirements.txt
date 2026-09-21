@@ -1,2 +1,1 @@
-# Runtime dependencies are intentionally empty in the initial scaffold.
-# ComfyUI provides the V3 API and its runtime dependencies.
+httpx>=0.27

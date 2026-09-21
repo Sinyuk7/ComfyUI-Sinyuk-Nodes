@@ -10,16 +10,16 @@ from sinyuk_nodes.extension import SinyukNodesExtension, comfy_entrypoint
 from sinyuk_nodes.registry import ALL_NODES, get_node_list
 
 
-def test_registry_is_explicit_and_starts_empty() -> None:
-    assert ALL_NODES == []
-    assert get_node_list() == []
+def test_registry_is_explicit() -> None:
+    assert [node.__name__ for node in ALL_NODES] == ["OpenAPIConfigNode", "LLMAPINode"]
+    assert get_node_list() == ALL_NODES
     assert get_node_list() is not ALL_NODES
 
 
 def test_entrypoint_returns_v3_extension() -> None:
     extension = asyncio.run(comfy_entrypoint())
     assert isinstance(extension, SinyukNodesExtension)
-    assert asyncio.run(extension.get_node_list()) == []
+    assert asyncio.run(extension.get_node_list()) == ALL_NODES
 
 
 def test_root_entrypoint_is_discoverable() -> None:

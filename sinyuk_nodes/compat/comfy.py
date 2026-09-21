@@ -2,6 +2,6 @@
 
 from __future__ import annotations
 
-from comfy_api.latest import ComfyExtension, io, ui
+from comfy_api.latest import ComfyAPI, ComfyExtension, io, ui
 
-__all__ = ["ComfyExtension", "io", "ui"]
+__all__ = ["ComfyAPI", "ComfyExtension", "io", "ui"]
