@@ -29,6 +29,7 @@ class OpenAPIConfig:
     model_input: str
     model_selection: str
     available_models: tuple[str, ...]
+    api_mode: str = "responses"
 
     @property
     def model(self) -> str:
@@ -49,6 +50,7 @@ def build_config(
     model_input: str,
     model_selection: str,
     available_models: tuple[str, ...],
+    api_mode: str = "responses",
 ) -> OpenAPIConfig:
     """Validate node values and create a runtime configuration."""
 
@@ -56,12 +58,15 @@ def build_config(
         raise ValueError("API Key is required.")
     if not isinstance(model_input, str) or not isinstance(model_selection, str):
         raise ValueError("Model values must be strings.")
+    if api_mode not in {"responses", "chat_completions"}:
+        raise ValueError("API mode must be responses or chat_completions.")
     return OpenAPIConfig(
         api_key=api_key.strip(),
         base_url=normalize_base_url(base_url),
         model_input=model_input,
         model_selection=model_selection,
         available_models=tuple(dict.fromkeys(available_models)),
+        api_mode=api_mode,
     )
 
 

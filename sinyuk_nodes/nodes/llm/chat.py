@@ -6,13 +6,14 @@ import torch
 from sinyuk_nodes.compat.comfy import io
 from sinyuk_nodes.features.llm.chat import execute_chat
 from sinyuk_nodes.features.llm.config import OpenAPIConfig
+from sinyuk_nodes.features.llm.schema import JSONSchemaDocument
 
 from .config import OPENAPI_CONFIG
+from .schema import JSON_SCHEMA
 
 _RESPONSE_FORMAT_VALUES = {
     "Text": "text",
     "JSON Schema": "json_schema",
-    "JSON Object (Deprecated)": "json_object",
 }
 
 
@@ -53,28 +54,18 @@ class LLMAPINode(io.ComfyNode):
                     optional=True,
                 ),
                 io.Combo.Input(
-                    "image_detail",
-                    options=["auto", "low", "high", "original"],
-                    default="high",
-                    display_name="Image Detail",
-                    tooltip="Detail level used when preparing images for the LLM API.",
-                ),
-                io.Combo.Input(
                     "response_format",
                     options=list(_RESPONSE_FORMAT_VALUES),
                     default="Text",
                     display_name="Response Format",
                     tooltip=(
-                        "Text, JSON Schema, or JSON Object (Deprecated) format requested "
-                        "from the model."
+                        "Text or JSON Schema Structured Outputs format requested from the model."
                     ),
                 ),
-                io.String.Input(
+                JSON_SCHEMA.Input(
                     "json_schema",
-                    default="",
-                    multiline=True,
                     display_name="JSON Schema",
-                    tooltip="JSON object schema used when response format is json_schema.",
+                    tooltip="Connect a validated JSON Schema node when using JSON Schema format.",
                     optional=True,
                 ),
                 io.Int.Input(
@@ -85,6 +76,14 @@ class LLMAPINode(io.ComfyNode):
                     control_after_generate=True,
                     display_name="Seed",
                     tooltip="Seed used for ComfyUI execution and cache identity.",
+                    advanced=True,
+                ),
+                io.Combo.Input(
+                    "image_detail",
+                    options=["auto", "low", "high", "original"],
+                    default="high",
+                    display_name="Image Detail",
+                    tooltip="Detail level used when preparing images for the LLM API.",
                     advanced=True,
                 ),
                 io.Float.Input(
@@ -136,7 +135,7 @@ class LLMAPINode(io.ComfyNode):
         images: torch.Tensor | None = None,
         image_detail: str = "high",
         response_format: str = "text",
-        json_schema: str = "",
+        json_schema: JSONSchemaDocument | None = None,
         seed: int = 0,
         temperature: float | None = None,
         top_p: float | None = None,

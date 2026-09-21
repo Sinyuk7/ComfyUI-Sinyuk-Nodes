@@ -219,4 +219,4 @@ __marimo__/
 
 
 sinyuk_nodes/.DS_Store
-tests/manual_llm_api_live_report.json
+test_data

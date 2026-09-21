@@ -11,7 +11,11 @@ from sinyuk_nodes.registry import ALL_NODES, get_node_list
 
 
 def test_registry_is_explicit() -> None:
-    assert [node.__name__ for node in ALL_NODES] == ["OpenAPIConfigNode", "LLMAPINode"]
+    assert [node.__name__ for node in ALL_NODES] == [
+        "OpenAPIConfigNode",
+        "JSONSchemaNode",
+        "LLMAPINode",
+    ]
     assert get_node_list() == ALL_NODES
     assert get_node_list() is not ALL_NODES
 

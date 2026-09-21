@@ -8,9 +8,10 @@ from collections import OrderedDict
 
 import torch
 
-from .client import complete_chat
+from .client import complete_chat, complete_response
 from .config import OpenAPIConfig
 from .image import EncodedImage, encode_images
+from .schema import JSONSchemaDocument
 
 _RESPONSE_CACHE: OrderedDict[str, str] = OrderedDict()
 _CACHE_LIMIT = 128
@@ -46,6 +47,27 @@ def _response_text(payload: object) -> str:
     return text
 
 
+def _responses_text(payload: object) -> str:
+    if not isinstance(payload, dict):
+        raise ValueError("The Responses API response has an invalid format.")
+    output = payload.get("output")
+    if not isinstance(output, list):
+        raise ValueError("The Responses API response did not contain output.")
+    parts: list[str] = []
+    for item in output:
+        if not isinstance(item, dict) or item.get("type") != "message":
+            continue
+        content = item.get("content")
+        if not isinstance(content, list):
+            continue
+        for block in content:
+            if isinstance(block, dict) and isinstance(block.get("text"), str):
+                parts.append(block["text"])
+    if not parts:
+        raise ValueError("The Responses API response did not contain text output.")
+    return "".join(parts)
+
+
 def build_payload(
     config: OpenAPIConfig,
     system_prompt: str,
@@ -55,7 +77,7 @@ def build_payload(
     top_p: float | None = None,
     max_tokens: int | None = None,
     response_format: str = "text",
-    json_schema: str = "",
+    json_schema: JSONSchemaDocument | None = None,
     image_detail: str = "high",
 ) -> dict[str, object]:
     user_content: str | list[dict[str, object]] = prompt
@@ -82,18 +104,62 @@ def build_payload(
         payload["top_p"] = top_p
     if max_tokens is not None:
         payload["max_tokens"] = max_tokens
-    if response_format == "json_object":
-        payload["response_format"] = {"type": "json_object"}
-    elif response_format == "json_schema":
-        try:
-            schema: object = json.loads(json_schema)
-        except json.JSONDecodeError as exc:
-            raise ValueError("JSON Schema must be valid JSON.") from exc
-        if not isinstance(schema, dict):
-            raise ValueError("JSON Schema must be a JSON object.")
+    if response_format == "json_schema":
+        if json_schema is None:
+            raise ValueError("Connect a JSON Schema node when using JSON Schema format.")
         payload["response_format"] = {
             "type": "json_schema",
-            "json_schema": {"name": "response", "strict": True, "schema": schema},
+            "json_schema": {
+                "name": json_schema.name,
+                "strict": True,
+                "schema": json_schema.schema,
+            },
+        }
+    elif response_format != "text":
+        raise ValueError("Unsupported response format.")
+    return payload
+
+
+def build_responses_payload(
+    config: OpenAPIConfig,
+    system_prompt: str,
+    prompt: str,
+    images: tuple[EncodedImage, ...],
+    temperature: float | None = None,
+    top_p: float | None = None,
+    max_tokens: int | None = None,
+    response_format: str = "text",
+    json_schema: JSONSchemaDocument | None = None,
+    image_detail: str = "high",
+) -> dict[str, object]:
+    content: str | list[dict[str, object]] = prompt
+    if images:
+        content = [{"type": "input_text", "text": prompt}]
+        content.extend(
+            {"type": "input_image", "image_url": image.base64_data_url, "detail": image_detail}
+            for image in images
+        )
+    input_items: list[dict[str, object]] = []
+    if system_prompt.strip():
+        input_items.append({"role": "system", "content": system_prompt})
+    input_items.append({"role": "user", "content": content})
+    payload: dict[str, object] = {"model": config.model, "input": input_items}
+    if temperature is not None:
+        payload["temperature"] = temperature
+    if top_p is not None:
+        payload["top_p"] = top_p
+    if max_tokens is not None:
+        payload["max_output_tokens"] = max_tokens
+    if response_format == "json_schema":
+        if json_schema is None:
+            raise ValueError("Connect a JSON Schema node when using JSON Schema format.")
+        payload["text"] = {
+            "format": {
+                "type": "json_schema",
+                "name": json_schema.name,
+                "strict": True,
+                "schema": json_schema.schema,
+            }
         }
     elif response_format != "text":
         raise ValueError("Unsupported response format.")
@@ -110,11 +176,12 @@ async def execute_chat(
     top_p: float | None = None,
     max_tokens: int | None = None,
     response_format: str = "text",
-    json_schema: str = "",
+    json_schema: JSONSchemaDocument | None = None,
     image_detail: str = "high",
 ) -> str:
     encoded = encode_images(images, image_detail)
-    payload = build_payload(
+    payload_builder = build_responses_payload if config.api_mode == "responses" else build_payload
+    payload = payload_builder(
         config,
         system_prompt,
         prompt,
@@ -137,7 +204,9 @@ async def execute_chat(
         "top_p": top_p,
         "max_tokens": max_tokens,
         "response_format": response_format,
-        "json_schema": json_schema,
+        "json_schema": None
+        if json_schema is None
+        else {"name": json_schema.name, "schema": json_schema.schema},
         # ComfyUI request/cache seed; never sent to the remote API.
         "seed": seed,
     }
@@ -151,7 +220,10 @@ async def execute_chat(
     if fingerprint in _RESPONSE_CACHE:
         _RESPONSE_CACHE.move_to_end(fingerprint)
         return _RESPONSE_CACHE[fingerprint]
-    result = _response_text(await complete_chat(config.base_url, config.api_key, payload))
+    if config.api_mode == "responses":
+        result = _responses_text(await complete_response(config.base_url, config.api_key, payload))
+    else:
+        result = _response_text(await complete_chat(config.base_url, config.api_key, payload))
     _RESPONSE_CACHE[fingerprint] = result
     _RESPONSE_CACHE.move_to_end(fingerprint)
     while len(_RESPONSE_CACHE) > _CACHE_LIMIT:
@@ -159,4 +231,4 @@ async def execute_chat(
     return result
 
 
-__all__ = ["build_payload", "execute_chat"]
+__all__ = ["build_payload", "build_responses_payload", "execute_chat"]

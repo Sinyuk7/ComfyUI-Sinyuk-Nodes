@@ -168,10 +168,49 @@ async def complete_chat(base_url: str, api_key: str, payload: dict[str, object])
     ) from last_error
 
 
+async def complete_response(base_url: str, api_key: str, payload: dict[str, object]) -> object:
+    """Send one Responses API request and return its decoded JSON payload."""
+
+    url = f"{base_url}/responses"
+    last_error: Exception | None = None
+    async with httpx.AsyncClient(timeout=httpx.Timeout(180.0, connect=15.0)) as client:
+        for attempt in range(3):
+            try:
+                response = await client.post(
+                    url, headers={"Authorization": f"Bearer {api_key}"}, json=payload
+                )
+                if response.status_code >= 400:
+                    error = OpenAPIRequestError(_error_message(response, api_key))
+                    if response.status_code in _RETRYABLE_STATUS_CODES and attempt < 2:
+                        last_error = error
+                        await asyncio.sleep(0.5 * (attempt + 1))
+                        continue
+                    raise error
+                return response.json()
+            except (httpx.TimeoutException, httpx.NetworkError, OSError) as exc:
+                last_error = exc
+                if attempt < 2:
+                    await asyncio.sleep(0.5 * (attempt + 1))
+                    continue
+                break
+            except httpx.HTTPError as exc:
+                last_error = exc
+                break
+            except (ValueError, OpenAPIRequestError) as exc:
+                last_error = exc
+                break
+    raise OpenAPIRequestError(
+        str(last_error)
+        if isinstance(last_error, OpenAPIRequestError)
+        else "The Responses API request failed."
+    ) from last_error
+
+
 __all__ = [
     "OpenAPIRequestError",
     "available_models",
     "cached_model_options",
     "complete_chat",
+    "complete_response",
     "fetch_models",
 ]

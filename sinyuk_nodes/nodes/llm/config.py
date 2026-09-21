@@ -31,6 +31,13 @@ class OpenAPIConfigNode(io.ComfyNode):
                     display_name="Provider",
                     tooltip="OpenAI-compatible API provider.",
                 ),
+                io.Combo.Input(
+                    "api_mode",
+                    options=["Responses API", "Chat Completions"],
+                    default="Responses API",
+                    display_name="API Mode",
+                    tooltip="Responses API is recommended for new integrations.",
+                ),
                 io.String.Input(
                     "api_key",
                     default="",
@@ -78,6 +85,7 @@ class OpenAPIConfigNode(io.ComfyNode):
     async def execute(
         cls,
         provider: str,
+        api_mode: str,
         api_key: str,
         base_url: str,
         model_input: str,
@@ -85,10 +93,14 @@ class OpenAPIConfigNode(io.ComfyNode):
     ) -> io.NodeOutput:
         if provider != "openapi":
             raise ValueError("Only the openapi provider is supported.")
-        config = build_config(api_key, base_url, model_input, model_selection, ())
+        api_modes = {"Responses API": "responses", "Chat Completions": "chat_completions"}
+        normalized_mode = api_modes.get(api_mode, api_mode)
+        config = build_config(api_key, base_url, model_input, model_selection, (), normalized_mode)
         models = available_models(config.base_url)
         if models:
-            config = build_config(api_key, base_url, model_input, model_selection, models)
+            config = build_config(
+                api_key, base_url, model_input, model_selection, models, normalized_mode
+            )
         models = config.available_models
         if not models:
             await ComfyAPI().execution.set_progress(0, 1, node_id=str(cls.hidden.unique_id))
@@ -99,7 +111,9 @@ class OpenAPIConfigNode(io.ComfyNode):
                     raise
                 models = ()
             await ComfyAPI().execution.set_progress(1, 1, node_id=str(cls.hidden.unique_id))
-            config = build_config(api_key, base_url, model_input, model_selection, models)
+            config = build_config(
+                api_key, base_url, model_input, model_selection, models, normalized_mode
+            )
         return io.NodeOutput(config)
 
 

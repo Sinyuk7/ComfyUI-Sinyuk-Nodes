@@ -108,11 +108,6 @@ def _cases(image_dir: Path) -> tuple[TestCase, ...]:
                 "json_schema": {"name": "outfit", "strict": True, "schema": schema},
             },
         ),
-        TestCase(
-            "json_object_deprecated",
-            "Return a JSON object with key status and value OK.",
-            response_format={"type": "json_object"},
-        ),
     )
 
 

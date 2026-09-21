@@ -3,9 +3,25 @@
 from __future__ import annotations
 
 import pytest
-from sinyuk_nodes.features.llm.chat import _response_text, build_payload
+from sinyuk_nodes.features.llm.chat import (
+    _response_text,
+    _responses_text,
+    build_payload,
+    build_responses_payload,
+)
 from sinyuk_nodes.features.llm.config import build_config
 from sinyuk_nodes.features.llm.image import EncodedImage
+from sinyuk_nodes.features.llm.schema import JSONSchemaDocument, parse_json_schema
+
+_SCHEMA = JSONSchemaDocument(
+    "status_result",
+    {
+        "type": "object",
+        "properties": {"status": {"type": "string"}},
+        "required": ["status"],
+        "additionalProperties": False,
+    },
+)
 
 
 def test_manual_model_takes_priority_over_dropdown() -> None:
@@ -96,3 +112,58 @@ def test_image_detail_is_sent_to_each_image() -> None:
 def test_refusal_is_reported_separately_from_malformed_content() -> None:
     with pytest.raises(ValueError, match="The model refused the request: unsafe request"):
         _response_text({"choices": [{"message": {"content": None, "refusal": "unsafe request"}}]})
+
+
+def test_chat_json_schema_is_sent_as_response_format() -> None:
+    config = build_config(
+        "secret", "https://example.test/v1", "", "listed-model", ("listed-model",)
+    )
+    payload = build_payload(
+        config, "", "Reply.", (), response_format="json_schema", json_schema=_SCHEMA
+    )
+    assert payload["response_format"] == {
+        "type": "json_schema",
+        "json_schema": {"name": "status_result", "strict": True, "schema": _SCHEMA.schema},
+    }
+
+
+def test_responses_json_schema_is_sent_as_text_format() -> None:
+    config = build_config(
+        "secret", "https://example.test/v1", "", "listed-model", ("listed-model",)
+    )
+    payload = build_responses_payload(
+        config, "System.", "Reply.", (), response_format="json_schema", json_schema=_SCHEMA
+    )
+    assert payload["text"] == {
+        "format": {
+            "type": "json_schema",
+            "name": "status_result",
+            "strict": True,
+            "schema": _SCHEMA.schema,
+        }
+    }
+
+
+def test_responses_text_extracts_output_text() -> None:
+    assert (
+        _responses_text(
+            {"output": [{"type": "message", "content": [{"type": "output_text", "text": "OK"}]}]}
+        )
+        == "OK"
+    )
+
+
+def test_schema_validation_requires_strict_object_properties() -> None:
+    with pytest.raises(ValueError, match="required"):
+        parse_json_schema(
+            '{"type":"object","properties":{"status":{"type":"string"}},'
+            '"required":[],"additionalProperties":false}'
+        )
+
+
+def test_json_schema_requires_connection_for_structured_output() -> None:
+    config = build_config(
+        "secret", "https://example.test/v1", "", "listed-model", ("listed-model",)
+    )
+    with pytest.raises(ValueError, match="Connect a JSON Schema"):
+        build_payload(config, "", "Reply.", (), response_format="json_schema")
