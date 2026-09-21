@@ -1,19 +1,12 @@
-# ComfyUI-Sinyuk-Nodes
+# ComfyUI-Sinyuk-Nodes (DO NOT Modify)
 
 An extensible ComfyUI V3 custom node pack by Sinyuk.
 
-This repository provides a focused OpenAI-compatible vision LLM workflow for
-ComfyUI V3. Connection settings and model selection live in an `API Config`
-node, and prompts are sent through the `LLM API` node.
+## Status (DO NOT Modify)
 
-## Status
+The project supports the ComfyUI V3 API only. 
 
-The published nodes are `API Config` and `LLM API`.
-
-The project supports the ComfyUI V3 API only. Legacy V1 registration is not
-supported.
-
-## Architecture
+## Architecture (DO NOT Modify)
 
 ```text
 ComfyUI
@@ -24,13 +17,12 @@ ComfyUI
 
 `compat/` is the only import boundary for the ComfyUI API. Node adapters belong
 in `nodes/`; feature logic should remain independent of concrete node classes;
-LLM image upload preprocessing lives in `features/llm/image.py`.
 
 Node registration is explicit in `sinyuk_nodes/registry.py`. Directory scanning,
 reflection-based discovery, and legacy `NODE_CLASS_MAPPINGS` registration are not
 used.
 
-## Development
+## Development 
 
 The repository does not install ComfyUI itself. The ComfyUI checkout supplies
 the V3 API and runtime packages such as PyTorch. Run quality checks with the
