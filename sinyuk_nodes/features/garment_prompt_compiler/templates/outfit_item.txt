@@ -1,0 +1,19 @@
+${item_title}
+
+References:
+${references}
+
+Shape:
+${shape}
+
+Fabric behavior:
+${fabric_behavior}
+
+Preserve:
+${must_preserve}
+
+Key details:
+${key_details}
+
+Presentation:
+${presentation}

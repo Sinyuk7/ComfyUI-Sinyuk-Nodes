@@ -14,6 +14,8 @@ def test_registry_is_explicit() -> None:
     assert [node.__name__ for node in ALL_NODES] == [
         "OpenAPIConfigNode",
         "JSONSchemaNode",
+        "GarmentAnalysisSchemaNode",
+        "GarmentPromptCompiler",
         "LLMAPINode",
     ]
     assert get_node_list() == ALL_NODES

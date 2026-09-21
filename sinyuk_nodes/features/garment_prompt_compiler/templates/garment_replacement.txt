@@ -1,0 +1,24 @@
+Use Image 1 as the fixed base subject.
+Preserve the person's identity, face, hairstyle, body proportions, pose, camera view, framing, crop, and subject scale.
+
+Replace the current outfit completely with the target outfit defined by Images 2 and onward.
+The clothing currently worn in Image 1 is not a target reference and must not be preserved.
+
+${reference_assignment}
+
+${outfit_items}
+
+Subject context:
+${subject_context}
+
+Adapt the target outfit naturally to the fixed subject and pose.
+Preserve the intended silhouette, structure, volume, drape, and important details of each item.
+Allow only folds, compression, overlap, and deformation naturally required by the pose and fabric behavior.
+
+Favor a clean, dimensional, well-shaped presentation with clear garment structure and minimal unnecessary wrinkling or collapse.
+
+When appropriate for the garment type, fabric, pose, and framing, allow subtle natural motion that helps reveal shape, drape, and dimensionality. Keep the motion physically plausible and preserve the intended silhouette and important details.
+
+Rebuild garment edges, overlaps, occlusion, folds, and contact naturally so the outfit looks genuinely worn by the subject.
+
+${extra_prompt}

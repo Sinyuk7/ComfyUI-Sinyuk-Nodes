@@ -1,0 +1,135 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "subject", "garments"],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "enum": ["1.0"]
+    },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["crop", "pose", "view", "notes"],
+      "properties": {
+        "crop": {
+          "type": "string",
+          "enum": [
+            "full_body",
+            "three_quarter",
+            "waist_up",
+            "bust_up",
+            "close_up"
+          ]
+        },
+        "pose": {
+          "type": "string",
+          "enum": ["standing", "walking", "seated", "crouching", "other"]
+        },
+        "view": {
+          "type": "string",
+          "enum": ["front", "three_quarter", "side", "back", "mixed"]
+        },
+        "notes": {
+          "type": "string",
+          "description": "Brief notes about occlusion, arm placement, pose impact, or how the subject view affects garment presentation. Use an empty string if no important note."
+        }
+      }
+    },
+    "garments": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "category",
+          "main_refs",
+          "detail_refs",
+          "shape",
+          "fabric_behavior",
+          "presentation",
+          "must_preserve",
+          "key_details"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "For example: garment_01, garment_02."
+          },
+          "category": {
+            "type": "string",
+            "description": "Examples: shirt, blouse, jacket, coat, knit_top, pants, skirt, dress, shorts, other."
+          },
+          "main_refs": {
+            "type": "array",
+            "description": "Reference image indexes that define the main garment silhouette and overall construction. These indexes start from 2 because image 1 is always the subject image.",
+            "items": {
+              "type": "integer",
+              "minimum": 2
+            }
+          },
+          "detail_refs": {
+            "type": "array",
+            "description": "Reference image indexes for useful detail images. Return an empty array if there are no useful detail references.",
+            "items": {
+              "type": "integer",
+              "minimum": 2
+            }
+          },
+          "shape": {
+            "type": "string",
+            "description": "The garment silhouette and key structural shape. Focus on overall shape, volume, shoulder line, waist line, hem, leg shape, skirt line, or major construction cues."
+          },
+          "fabric_behavior": {
+            "type": "string",
+            "description": "How the fabric should behave when worn, such as crisp, structured, soft, fluid, controlled drape, smooth, or tidy."
+          },
+          "presentation": {
+            "type": "string",
+            "description": "How the garment should be presented on the subject to best show its shape, such as visually flat front panel, strong three-dimensional silhouette, smooth flowing skirt, clean waistband, or minimal unnecessary wrinkles."
+          },
+          "must_preserve": {
+            "type": "array",
+            "description": "Critical garment regions or structural elements that must stay faithful, such as collar shape, shoulder line, waistband, placket, pocket shape, or hem line.",
+            "items": {
+              "type": "string"
+            }
+          },
+          "key_details": {
+            "type": "array",
+            "description": "Only include clearly useful and clearly identifiable garment details. Do not include tiny ambiguous details that cannot be reliably placed.",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["region", "description", "source_refs", "priority"],
+              "properties": {
+                "region": {
+                  "type": "string",
+                  "description": "The garment region where the detail belongs, such as left_chest, collar, cuff, waistband, front_placket, hem, pocket, zipper_area. Use a short clear label."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "A short factual description of the detail, such as small embroidered logo, exposed metal zipper, contrast button row, floral print panel, or ribbed cuff."
+                },
+                "source_refs": {
+                  "type": "array",
+                  "description": "Reference image indexes that show this detail.",
+                  "items": {
+                    "type": "integer",
+                    "minimum": 2
+                  }
+                },
+                "priority": {
+                  "type": "string",
+                  "enum": ["critical", "important", "supporting"]
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
