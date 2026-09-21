@@ -110,11 +110,14 @@ class LLMAPINode(io.ComfyNode):
                 ),
                 io.Int.Input(
                     "max_tokens",
-                    default=None,
-                    min=1,
+                    default=2048,
+                    min=512,
                     max=1_000_000,
                     display_name="Max Tokens",
-                    tooltip="Optional maximum number of output tokens (sent as max_tokens).",
+                    tooltip=(
+                        "Maximum number of output tokens. Defaults to 2048 for structured "
+                        "garment analysis."
+                    ),
                     optional=True,
                     advanced=True,
                 ),

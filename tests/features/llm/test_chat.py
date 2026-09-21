@@ -153,6 +153,29 @@ def test_responses_text_extracts_output_text() -> None:
     )
 
 
+def test_responses_payload_keeps_every_image_input() -> None:
+    config = build_config(
+        "secret", "https://example.test/v1", "", "listed-model", ("listed-model",)
+    )
+    images = tuple(
+        EncodedImage(
+            encoded_bytes=b"abc",
+            base64_data_url=f"data:image/jpeg;base64,abc{index}",
+            sha256=f"hash-{index}",
+            mime_type="image/jpeg",
+            width=1,
+            height=1,
+        )
+        for index in range(4)
+    )
+    payload = build_responses_payload(config, "", "Analyze.", images)
+    input_items = payload["input"]
+    assert isinstance(input_items, list)
+    content = input_items[0]["content"]
+    assert isinstance(content, list)
+    assert [item["type"] for item in content[1:]] == ["input_image"] * 4
+
+
 def test_schema_validation_requires_strict_object_properties() -> None:
     with pytest.raises(ValueError, match="required"):
         parse_json_schema(
