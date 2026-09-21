@@ -7,8 +7,8 @@ their classes from this module instead of relying on import-time discovery.
 from __future__ import annotations
 
 from .compat.comfy import io
-from .nodes.api_config import OpenAPIConfigNode
-from .nodes.llm_api import LLMAPINode
+from .nodes.llm.chat import LLMAPINode
+from .nodes.llm.config import OpenAPIConfigNode
 
 # Keep registration explicit so the published node surface remains reviewable.
 ALL_NODES: list[type[io.ComfyNode]] = [OpenAPIConfigNode, LLMAPINode]

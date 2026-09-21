@@ -4,10 +4,16 @@ from __future__ import annotations
 
 import torch
 from sinyuk_nodes.compat.comfy import io
-from sinyuk_nodes.features.llm_api import execute_chat
-from sinyuk_nodes.features.openapi_config import OpenAPIConfig
+from sinyuk_nodes.features.llm.chat import execute_chat
+from sinyuk_nodes.features.llm.config import OpenAPIConfig
 
-from .api_config import OPENAPI_CONFIG
+from .config import OPENAPI_CONFIG
+
+_RESPONSE_FORMAT_VALUES = {
+    "Text": "text",
+    "JSON Schema": "json_schema",
+    "JSON Object (Deprecated)": "json_object",
+}
 
 
 class LLMAPINode(io.ComfyNode):
@@ -55,10 +61,13 @@ class LLMAPINode(io.ComfyNode):
                 ),
                 io.Combo.Input(
                     "response_format",
-                    options=["text", "json_object", "json_schema"],
-                    default="text",
+                    options=list(_RESPONSE_FORMAT_VALUES),
+                    default="Text",
                     display_name="Response Format",
-                    tooltip="Format requested from the model.",
+                    tooltip=(
+                        "Text, JSON Schema, or JSON Object (Deprecated) format requested "
+                        "from the model."
+                    ),
                 ),
                 io.String.Input(
                     "json_schema",
@@ -80,31 +89,34 @@ class LLMAPINode(io.ComfyNode):
                 ),
                 io.Float.Input(
                     "temperature",
-                    default=0.7,
+                    default=None,
                     min=0.0,
                     max=2.0,
                     step=0.01,
                     display_name="Temperature",
-                    tooltip="Sampling temperature sent to the API.",
+                    tooltip="Optional sampling temperature sent to the API.",
+                    optional=True,
                     advanced=True,
                 ),
                 io.Float.Input(
                     "top_p",
-                    default=1.0,
+                    default=None,
                     min=0.0,
                     max=1.0,
                     step=0.01,
                     display_name="Top P",
-                    tooltip="Nucleus sampling probability sent to the API.",
+                    tooltip="Optional nucleus sampling probability sent to the API.",
+                    optional=True,
                     advanced=True,
                 ),
                 io.Int.Input(
                     "max_tokens",
-                    default=1024,
+                    default=None,
                     min=1,
                     max=1_000_000,
                     display_name="Max Tokens",
-                    tooltip="Maximum number of output tokens.",
+                    tooltip="Optional maximum number of output tokens (sent as max_tokens).",
+                    optional=True,
                     advanced=True,
                 ),
             ],
@@ -126,12 +138,13 @@ class LLMAPINode(io.ComfyNode):
         response_format: str = "text",
         json_schema: str = "",
         seed: int = 0,
-        temperature: float = 0.7,
-        top_p: float = 1.0,
-        max_tokens: int = 1024,
+        temperature: float | None = None,
+        top_p: float | None = None,
+        max_tokens: int | None = None,
     ) -> io.NodeOutput:
         if not isinstance(api_config, OpenAPIConfig):
             raise ValueError("Connect an API Config node.")
+        response_format = _RESPONSE_FORMAT_VALUES.get(response_format, response_format)
         response = await execute_chat(
             api_config,
             system_prompt,

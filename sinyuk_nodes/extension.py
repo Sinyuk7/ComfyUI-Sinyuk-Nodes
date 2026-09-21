@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from .compat.comfy import ComfyExtension, io
-from .features.openapi_client import cached_model_options
+from .features.llm.client import cached_model_options
 from .registry import get_node_list
 
 

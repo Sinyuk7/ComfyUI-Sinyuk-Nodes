@@ -61,9 +61,7 @@ def _to_pil(image: torch.Tensor, index: int) -> Image.Image:
 
 
 def _patches(width: int, height: int) -> int:
-    return ((width + _PATCH_SIZE - 1) // _PATCH_SIZE) * (
-        (height + _PATCH_SIZE - 1) // _PATCH_SIZE
-    )
+    return ((width + _PATCH_SIZE - 1) // _PATCH_SIZE) * ((height + _PATCH_SIZE - 1) // _PATCH_SIZE)
 
 
 def _resize_for_detail(image: Image.Image, detail: ImageDetail) -> Image.Image:
@@ -134,9 +132,7 @@ def encode_image(image: torch.Tensor, detail: str = "high", index: int = 1) -> E
     )
 
 
-def encode_images(
-    images: torch.Tensor | None, detail: str = "high"
-) -> tuple[EncodedImage, ...]:
+def encode_images(images: torch.Tensor | None, detail: str = "high") -> tuple[EncodedImage, ...]:
     """Encode a ComfyUI IMAGE batch for LLM upload."""
 
     if images is None:

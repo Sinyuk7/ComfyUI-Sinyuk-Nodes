@@ -216,3 +216,7 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+
+sinyuk_nodes/.DS_Store
+tests/manual_llm_api_live_report.json

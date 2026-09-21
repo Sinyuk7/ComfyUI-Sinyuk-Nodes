@@ -38,11 +38,9 @@ class OpenAPIConfig:
         if manual:
             return manual
         selected = self.model_selection.strip()
-        if selected and selected != "auto":
+        if selected and selected != "auto" and selected in self.available_models:
             return selected
-        if self.available_models:
-            return self.available_models[0]
-        raise ValueError("Enter a model or select a model after the model list has been loaded.")
+        raise ValueError("Enter a custom model or select a model from the dropdown.")
 
 
 def build_config(

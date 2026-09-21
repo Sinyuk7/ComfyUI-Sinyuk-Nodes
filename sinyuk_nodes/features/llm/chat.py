@@ -7,10 +7,10 @@ import json
 from collections import OrderedDict
 
 import torch
-from sinyuk_nodes.common.llm_image import EncodedImage, encode_images
 
-from .openapi_client import complete_chat
-from .openapi_config import OpenAPIConfig
+from .client import complete_chat
+from .config import OpenAPIConfig
+from .image import EncodedImage, encode_images
 
 _RESPONSE_CACHE: OrderedDict[str, str] = OrderedDict()
 _CACHE_LIMIT = 128
@@ -37,6 +37,9 @@ def _response_text(payload: object) -> str:
     message = choices[0].get("message")
     if not isinstance(message, dict):
         raise ValueError("The chat response did not contain a message.")
+    refusal = message.get("refusal")
+    if isinstance(refusal, str) and refusal.strip():
+        raise ValueError(f"The model refused the request: {refusal.strip()}")
     text = _content_text(message.get("content"))
     if not text:
         raise ValueError("The chat response did not contain text content.")
@@ -48,12 +51,12 @@ def build_payload(
     system_prompt: str,
     prompt: str,
     images: tuple[EncodedImage, ...],
-    temperature: float,
-    top_p: float,
-    max_tokens: int,
-    response_format: str,
-    json_schema: str,
-    detail: str = "high",
+    temperature: float | None = None,
+    top_p: float | None = None,
+    max_tokens: int | None = None,
+    response_format: str = "text",
+    json_schema: str = "",
+    image_detail: str = "high",
 ) -> dict[str, object]:
     user_content: str | list[dict[str, object]] = prompt
     if images:
@@ -61,7 +64,7 @@ def build_payload(
         user_content.extend(
             {
                 "type": "image_url",
-                "image_url": {"url": image.base64_data_url, "detail": detail},
+                "image_url": {"url": image.base64_data_url, "detail": image_detail},
             }
             for image in images
         )
@@ -72,10 +75,13 @@ def build_payload(
     payload: dict[str, object] = {
         "model": config.model,
         "messages": messages,
-        "temperature": temperature,
-        "top_p": top_p,
-        "max_tokens": max_tokens,
     }
+    if temperature is not None:
+        payload["temperature"] = temperature
+    if top_p is not None:
+        payload["top_p"] = top_p
+    if max_tokens is not None:
+        payload["max_tokens"] = max_tokens
     if response_format == "json_object":
         payload["response_format"] = {"type": "json_object"}
     elif response_format == "json_schema":
@@ -100,14 +106,14 @@ async def execute_chat(
     prompt: str,
     images: torch.Tensor | None,
     seed: int,
-    temperature: float,
-    top_p: float,
-    max_tokens: int,
-    response_format: str,
-    json_schema: str,
-    detail: str = "high",
+    temperature: float | None = None,
+    top_p: float | None = None,
+    max_tokens: int | None = None,
+    response_format: str = "text",
+    json_schema: str = "",
+    image_detail: str = "high",
 ) -> str:
-    encoded = encode_images(images, detail)
+    encoded = encode_images(images, image_detail)
     payload = build_payload(
         config,
         system_prompt,
@@ -118,16 +124,26 @@ async def execute_chat(
         max_tokens,
         response_format,
         json_schema,
-        detail,
+        image_detail,
     )
+    fingerprint_data: dict[str, object] = {
+        "base_url": config.base_url,
+        "model": config.model,
+        "system_prompt": system_prompt,
+        "prompt": prompt,
+        "image_sha256": [image.sha256 for image in encoded],
+        "image_detail": image_detail,
+        "temperature": temperature,
+        "top_p": top_p,
+        "max_tokens": max_tokens,
+        "response_format": response_format,
+        "json_schema": json_schema,
+        # ComfyUI request/cache seed; never sent to the remote API.
+        "seed": seed,
+    }
     fingerprint = hashlib.sha256(
         json.dumps(
-            {
-                "base_url": config.base_url,
-                **payload,
-                "image_hashes": [image.sha256 for image in encoded],
-                "seed": seed,
-            },
+            fingerprint_data,
             sort_keys=True,
             separators=(",", ":"),
         ).encode()

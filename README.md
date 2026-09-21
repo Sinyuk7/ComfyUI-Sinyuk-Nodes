@@ -24,7 +24,7 @@ ComfyUI
 
 `compat/` is the only import boundary for the ComfyUI API. Node adapters belong
 in `nodes/`; feature logic should remain independent of concrete node classes;
-LLM image upload preprocessing lives in `common/llm_image.py`.
+LLM image upload preprocessing lives in `features/llm/image.py`.
 
 Node registration is explicit in `sinyuk_nodes/registry.py`. Directory scanning,
 reflection-based discovery, and legacy `NODE_CLASS_MAPPINGS` registration are not
@@ -32,20 +32,31 @@ used.
 
 ## Development
 
-Install development tools into the environment used by ComfyUI:
+The repository does not install ComfyUI itself. The ComfyUI checkout supplies
+the V3 API and runtime packages such as PyTorch. Run quality checks with the
+same Python environment that runs ComfyUI, and point both `COMFYUI_PATH` and
+`PYTHONPATH` at that checkout:
 
 ```bash
-python -m pip install -r requirements-dev.txt
+export COMFYUI_PATH=/path/to/ComfyUI
+export PYTHONPATH="$COMFYUI_PATH:$PWD"
+
+"$PYTHON" -m pip install -r requirements-dev.txt -r requirements.txt
+"$PYTHON" -m ruff check .
+"$PYTHON" -m ruff format --check .
+"$PYTHON" -m pyright
+"$PYTHON" -m pytest
 ```
 
-Set `COMFYUI_PATH` to a ComfyUI checkout when running tests that import the V3
-API:
+If ComfyUI is installed into another environment, replace the `PYTHON` value
+with that environment's interpreter. Do not commit a machine-specific
+ComfyUI path; `COMFYUI_PATH` is intentionally supplied by each checkout or CI
+job.
 
 ```bash
-COMFYUI_PATH=/path/to/ComfyUI python -m pytest
-COMFYUI_PATH=/path/to/ComfyUI pyright
-ruff check .
-ruff format --check .
+COMFYUI_PATH=/path/to/ComfyUI \
+PYTHONPATH=/path/to/ComfyUI:$PWD \
+/path/to/ComfyUI/.venv/bin/python -m pytest
 ```
 
 Published node IDs are workflow compatibility contracts and must remain stable.

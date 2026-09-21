@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 from sinyuk_nodes.compat.comfy import ComfyAPI, io
-from sinyuk_nodes.features.openapi_client import (
+from sinyuk_nodes.features.llm.client import (
     OpenAPIRequestError,
     available_models,
     fetch_models,
 )
-from sinyuk_nodes.features.openapi_config import build_config
+from sinyuk_nodes.features.llm.config import build_config
 
 OPENAPI_CONFIG = io.Custom("OPENAPI_CONFIG")
 
