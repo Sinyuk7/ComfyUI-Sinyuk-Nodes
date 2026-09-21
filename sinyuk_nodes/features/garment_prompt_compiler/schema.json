@@ -14,30 +14,52 @@
       "properties": {
         "crop": {
           "type": "string",
+          "description": "The visible body framing in Image 1. This describes how much of the subject is included in the frame, not the subject's orientation.",
           "enum": [
             "full_body",
-            "three_quarter",
+            "three_quarter_body",
             "waist_up",
             "bust_up",
-            "close_up"
+            "close_up",
+            "lower_body"
           ]
         },
         "pose": {
           "type": "string",
-          "enum": ["standing", "walking", "seated", "crouching", "other"]
+          "description": "The subject's primary whole-body pose. Use the closest broad category and describe important variations such as raised arms, crossed legs, leaning, hand placement, or unusual limb positions in notes.",
+          "enum": [
+            "standing",
+            "walking",
+            "seated",
+            "kneeling",
+            "crouching",
+            "reclining",
+            "lying",
+            "dynamic",
+            "other"
+          ]
         },
         "view": {
           "type": "string",
-          "enum": ["front", "three_quarter", "side", "back", "mixed"]
+          "description": "The dominant torso and body orientation relative to the camera. Base this on the body rather than facial direction. Camera elevation and perspective belong in notes.",
+          "enum": [
+            "front",
+            "three_quarter_front",
+            "side",
+            "three_quarter_back",
+            "back",
+            "mixed"
+          ]
         },
         "notes": {
           "type": "string",
-          "description": "Brief notes about occlusion, arm placement, pose impact, or how the subject view affects garment presentation. Use an empty string if no important note."
+          "description": "Brief context that materially affects outfit reconstruction but is not represented by crop, pose, or view: body lean, raised or crossed limbs, hand placement, body-related occlusion, camera elevation or perspective when clearly relevant, wind or visible motion, floor or chair contact, and other pose-specific effects on garment presentation. Ignore the clothing currently worn in Image 1. Do not guess an exact focal length. Use an empty string if there is nothing important to add."
         }
       }
     },
     "garments": {
       "type": "array",
+      "description": "All target outfit items intentionally shown in Images 2 and onward, including garments, footwear, bags, belts, hats, and other visible accessories.",
       "minItems": 1,
       "items": {
         "type": "object",
@@ -56,15 +78,15 @@
         "properties": {
           "id": {
             "type": "string",
-            "description": "For example: garment_01, garment_02."
+            "description": "A stable sequential item identifier, for example garment_01 or garment_02."
           },
           "category": {
             "type": "string",
-            "description": "Examples: shirt, blouse, jacket, coat, knit_top, pants, skirt, dress, shorts, other."
+            "description": "Use a concise, recognizable English category for the target item, such as shirt, blouse, jacket, coat, knit_top, pants, skirt, dress, shorts, shoes, boots, belt, bag, hat, scarf, or accessory. Avoid 'other' when a more specific category can be identified."
           },
           "main_refs": {
             "type": "array",
-            "description": "Reference image indexes that define the main garment silhouette and overall construction. These indexes start from 2 because image 1 is always the subject image.",
+            "description": "Image indexes from Images 2 onward that best define this target item's overall silhouette, proportions, structure, or major visible construction. The same reference image may be used by more than one outfit item.",
             "items": {
               "type": "integer",
               "minimum": 2
@@ -72,7 +94,7 @@
           },
           "detail_refs": {
             "type": "array",
-            "description": "Reference image indexes for useful detail images. Return an empty array if there are no useful detail references.",
+            "description": "Image indexes that provide useful additional local information for this item, such as neckline, buttons, logo, zipper, slit, hardware, fabric construction, shoe details, or other clearly identifiable features. Use an empty array when no additional detail reference is useful.",
             "items": {
               "type": "integer",
               "minimum": 2
@@ -80,26 +102,26 @@
           },
           "shape": {
             "type": "string",
-            "description": "The garment silhouette and key structural shape. Focus on overall shape, volume, shoulder line, waist line, hem, leg shape, skirt line, or major construction cues."
+            "description": "The target item's intrinsic silhouette and structural form. Describe only design-defining shape information such as overall proportion, volume, shoulder line, bodice shape, waist placement, skirt shape, leg width, hem shape, shoe silhouette, or other major construction cues. Do not describe pose-induced folds, wind, temporary deformation, or styling inherited from Image 1."
           },
           "fabric_behavior": {
             "type": "string",
-            "description": "How the fabric should behave when worn, such as crisp, structured, soft, fluid, controlled drape, smooth, or tidy."
+            "description": "Describe how the item's visible material should physically behave when worn or moved, focusing on qualities such as crispness, softness, stretch, structure, fluidity, volume retention, drape, cling, and fold behavior. Describe visible behavior rather than guessing exact fiber composition unless it is clearly evident."
           },
           "presentation": {
             "type": "string",
-            "description": "How the garment should be presented on the subject to best show its shape, such as visually flat front panel, strong three-dimensional silhouette, smooth flowing skirt, clean waistband, or minimal unnecessary wrinkles."
+            "description": "Describe how this target item should be worn and presented on the specific subject pose, crop, view, and visible motion to best showcase its intended silhouette, structure, volume, drape, and important details. Favor a clean, dimensional, well-shaped result with controlled natural folds. Allow appropriate tuck, layering, spreading, compression, or subtle motion when it improves presentation and is consistent with the target references and subject pose. Do not inherit styling or layering from the clothing originally worn in Image 1, and do not force naturally hidden details to become visible."
           },
           "must_preserve": {
             "type": "array",
-            "description": "Critical garment regions or structural elements that must stay faithful, such as collar shape, shoulder line, waistband, placket, pocket shape, or hem line.",
+            "description": "Only design-defining structural regions or features whose alteration would noticeably change the identity or construction of the target item, such as collar shape, shoulder structure, waistband, placket, pocket placement, waist seam, slit position, leg silhouette, shoe shape, or distinctive construction. Do not use this field for ordinary color or generic appearance unless it is genuinely design-defining.",
             "items": {
               "type": "string"
             }
           },
           "key_details": {
             "type": "array",
-            "description": "Only include clearly useful and clearly identifiable garment details. Do not include tiny ambiguous details that cannot be reliably placed.",
+            "description": "Clearly identifiable details that materially improve reconstruction fidelity. Include distinctive logos, graphics, stripe or pattern alignment, embroidery, buttons, zippers, pockets, slits, trims, buckles, hardware, shoe construction, or similar features. Exclude tiny ambiguous details that cannot be reliably identified or mapped, and avoid generic information already obvious from the reference image unless it is design-defining.",
             "items": {
               "type": "object",
               "additionalProperties": false,
@@ -107,15 +129,15 @@
               "properties": {
                 "region": {
                   "type": "string",
-                  "description": "The garment region where the detail belongs, such as left_chest, collar, cuff, waistband, front_placket, hem, pocket, zipper_area. Use a short clear label."
+                  "description": "A short English semantic location for the detail, such as overall, left_chest, collar, cuff, waistband, front_placket, pocket, side_hem, zipper_area, footwear, bag_front, or buckle."
                 },
                 "description": {
                   "type": "string",
-                  "description": "A short factual description of the detail, such as small embroidered logo, exposed metal zipper, contrast button row, floral print panel, or ribbed cuff."
+                  "description": "A short factual description of the visible design detail. Describe what must be reconstructed, not how aesthetically attractive it is."
                 },
                 "source_refs": {
                   "type": "array",
-                  "description": "Reference image indexes that show this detail.",
+                  "description": "The actual input image indexes that clearly show this detail.",
                   "items": {
                     "type": "integer",
                     "minimum": 2
@@ -123,6 +145,7 @@
                 },
                 "priority": {
                   "type": "string",
+                  "description": "critical: losing or changing this detail would materially change the item's identity. important: a meaningful design or construction detail that should be preserved when visible. supporting: useful secondary information that should not override silhouette, structure, or higher-priority details.",
                   "enum": ["critical", "important", "supporting"]
                 }
               }

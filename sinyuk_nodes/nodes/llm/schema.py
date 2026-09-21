@@ -1,5 +1,8 @@
 """ComfyUI node for loading a strict JSON Schema."""
 
+# See the V3 adapter-boundary note in ``nodes.llm.chat``.
+# pyright: reportIncompatibleMethodOverride=false
+
 from __future__ import annotations
 
 from sinyuk_nodes.compat.comfy import io

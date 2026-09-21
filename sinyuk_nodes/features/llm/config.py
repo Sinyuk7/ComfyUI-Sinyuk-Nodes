@@ -9,8 +9,6 @@ from urllib.parse import urlsplit
 def normalize_base_url(value: str) -> str:
     """Validate and normalize an OpenAI-compatible API base URL."""
 
-    if not isinstance(value, str):
-        raise ValueError("Base URL must be a string.")
     base_url = value.strip().rstrip("/")
     parsed = urlsplit(base_url)
     if parsed.scheme not in {"http", "https"} or not parsed.hostname:
@@ -54,10 +52,8 @@ def build_config(
 ) -> OpenAPIConfig:
     """Validate node values and create a runtime configuration."""
 
-    if not isinstance(api_key, str) or not api_key.strip():
+    if not api_key.strip():
         raise ValueError("API Key is required.")
-    if not isinstance(model_input, str) or not isinstance(model_selection, str):
-        raise ValueError("Model values must be strings.")
     if api_mode not in {"responses", "chat_completions"}:
         raise ValueError("API mode must be responses or chat_completions.")
     return OpenAPIConfig(

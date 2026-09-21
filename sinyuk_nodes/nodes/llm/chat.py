@@ -1,5 +1,10 @@
 """ComfyUI node adapter for OpenAI-compatible chat completions."""
 
+# ComfyUI V3 stubs currently reject heterogeneous input subclasses, optional
+# ``None`` defaults, and async execute signatures accepted by runtime dispatch.
+# These are adapter-boundary typing defects in the external stubs.
+# pyright: reportArgumentType=false, reportIncompatibleMethodOverride=false
+
 from __future__ import annotations
 
 import torch
@@ -149,8 +154,6 @@ class LLMAPINode(io.ComfyNode):
         top_p: float | None = None,
         max_tokens: int | None = None,
     ) -> io.NodeOutput:
-        if not isinstance(api_config, OpenAPIConfig):
-            raise ValueError("Connect an API Config node.")
         response_format = _RESPONSE_FORMAT_VALUES.get(response_format, response_format)
         result = await execute_chat(
             api_config,

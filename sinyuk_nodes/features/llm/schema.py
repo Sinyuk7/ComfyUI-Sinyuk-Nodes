@@ -6,9 +6,18 @@ import json
 import re
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TypeGuard
 
 _NAME_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 _JSON_TYPES = {"array", "boolean", "integer", "null", "number", "object", "string"}
+
+
+def _is_object(value: object) -> TypeGuard[dict[str, object]]:
+    return isinstance(value, dict)
+
+
+def _is_list(value: object) -> TypeGuard[list[object]]:
+    return isinstance(value, list)
 
 
 @dataclass(frozen=True)
@@ -20,27 +29,27 @@ class JSONSchemaDocument:
 
 
 def _validate_schema_node(value: object, path: str) -> None:
-    if not isinstance(value, dict):
+    if not _is_object(value):
         raise ValueError(f"JSON Schema {path} must be an object.")
     schema_type = value.get("type")
     if schema_type is not None and not (
         isinstance(schema_type, str)
         and schema_type in _JSON_TYPES
-        or isinstance(schema_type, list)
+        or _is_list(schema_type)
         and schema_type
         and all(isinstance(item, str) and item in _JSON_TYPES for item in schema_type)
     ):
         raise ValueError(f"JSON Schema {path}.type must be a supported JSON type.")
     properties = value.get("properties")
     if properties is not None:
-        if not isinstance(properties, dict) or not all(isinstance(key, str) for key in properties):
+        if not _is_object(properties):
             raise ValueError(f"JSON Schema {path}.properties must be an object.")
         if value.get("additionalProperties") is not False:
             raise ValueError(
                 f"JSON Schema {path} must set additionalProperties to false for strict output."
             )
         required = value.get("required")
-        if not isinstance(required, list) or set(required) != set(properties):
+        if not _is_list(required) or set(required) != set(properties):
             raise ValueError(
                 f"JSON Schema {path}.required must contain every property exactly "
                 "for strict output."
@@ -52,7 +61,7 @@ def _validate_schema_node(value: object, path: str) -> None:
         _validate_schema_node(items, f"{path}.items")
     any_of = value.get("anyOf")
     if any_of is not None:
-        if not isinstance(any_of, list) or not any_of:
+        if not _is_list(any_of) or not any_of:
             raise ValueError(f"JSON Schema {path}.anyOf must be a non-empty array.")
         for index, child in enumerate(any_of):
             _validate_schema_node(child, f"{path}.anyOf[{index}]")
@@ -65,7 +74,7 @@ def parse_json_schema(raw: str, name: str = "") -> JSONSchemaDocument:
         value: object = json.loads(raw)
     except json.JSONDecodeError as exc:
         raise ValueError("JSON Schema must be valid JSON.") from exc
-    if not isinstance(value, dict):
+    if not _is_object(value):
         raise ValueError("JSON Schema must be a JSON object.")
     if value.get("type") != "object":
         raise ValueError("The root JSON Schema type must be object for strict output.")

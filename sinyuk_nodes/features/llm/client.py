@@ -31,7 +31,11 @@ def _error_message(response: httpx.Response, api_key: str) -> str:
 
 
 def _is_object(value: object) -> TypeGuard[dict[str, object]]:
-    return isinstance(value, dict) and all(isinstance(key, str) for key in value)
+    return isinstance(value, dict)
+
+
+def _is_list(value: object) -> TypeGuard[list[object]]:
+    return isinstance(value, list)
 
 
 def _catalog_path() -> Path:
@@ -55,8 +59,10 @@ def _read_catalog() -> dict[str, tuple[str, ...]]:
         return {}
     result: dict[str, tuple[str, ...]] = {}
     for base_url, models in raw.items():
-        if isinstance(models, list) and all(isinstance(model, str) and model for model in models):
-            result[base_url] = tuple(dict.fromkeys(models))
+        if _is_list(models):
+            model_ids = [model for model in models if isinstance(model, str) and model]
+            if len(model_ids) == len(models):
+                result[base_url] = tuple(dict.fromkeys(model_ids))
     return result
 
 
@@ -100,13 +106,19 @@ async def fetch_models(base_url: str, api_key: str) -> tuple[str, ...]:
                         continue
                     raise error
                 payload: object = response.json()
-                if not _is_object(payload) or not isinstance(payload.get("data"), list):
+                if not _is_object(payload):
                     raise OpenAPIRequestError("The models response has an invalid format.")
-                models = tuple(
-                    item["id"]
-                    for item in payload["data"]
-                    if _is_object(item) and isinstance(item.get("id"), str) and item["id"]
-                )
+                data_value = payload.get("data")
+                if not _is_list(data_value):
+                    raise OpenAPIRequestError("The models response has an invalid format.")
+                data = data_value
+                models_list: list[str] = []
+                for item in data:
+                    if _is_object(item):
+                        model_id = item.get("id")
+                        if isinstance(model_id, str) and model_id:
+                            models_list.append(model_id)
+                models = tuple(models_list)
                 if not models:
                     raise OpenAPIRequestError("The models response did not contain any model IDs.")
                 _write_catalog(base_url, tuple(dict.fromkeys(models)))

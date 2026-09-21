@@ -7,6 +7,7 @@ import json
 from collections import OrderedDict
 from dataclasses import dataclass
 from time import perf_counter
+from typing import TypeGuard
 
 import torch
 
@@ -52,23 +53,25 @@ def _execution_summary(
 def _content_text(value: object) -> str:
     if isinstance(value, str):
         return value
-    if isinstance(value, list):
-        parts = []
+    if _is_list(value):
+        parts: list[str] = []
         for item in value:
-            if isinstance(item, dict) and isinstance(item.get("text"), str):
-                parts.append(item["text"])
+            if _is_object(item):
+                text = item.get("text")
+                if isinstance(text, str):
+                    parts.append(text)
         return "".join(parts)
     return ""
 
 
 def _response_text(payload: object) -> str:
-    if not isinstance(payload, dict):
+    if not _is_object(payload):
         raise ValueError("The chat response has an invalid format.")
     choices = payload.get("choices")
-    if not isinstance(choices, list) or not choices or not isinstance(choices[0], dict):
+    if not _is_list(choices) or not choices or not _is_object(choices[0]):
         raise ValueError("The chat response did not contain a choice.")
     message = choices[0].get("message")
-    if not isinstance(message, dict):
+    if not _is_object(message):
         raise ValueError("The chat response did not contain a message.")
     refusal = message.get("refusal")
     if isinstance(refusal, str) and refusal.strip():
@@ -80,24 +83,34 @@ def _response_text(payload: object) -> str:
 
 
 def _responses_text(payload: object) -> str:
-    if not isinstance(payload, dict):
+    if not _is_object(payload):
         raise ValueError("The Responses API response has an invalid format.")
     output = payload.get("output")
-    if not isinstance(output, list):
+    if not _is_list(output):
         raise ValueError("The Responses API response did not contain output.")
     parts: list[str] = []
     for item in output:
-        if not isinstance(item, dict) or item.get("type") != "message":
+        if not _is_object(item) or item.get("type") != "message":
             continue
         content = item.get("content")
-        if not isinstance(content, list):
+        if not _is_list(content):
             continue
         for block in content:
-            if isinstance(block, dict) and isinstance(block.get("text"), str):
-                parts.append(block["text"])
+            if _is_object(block):
+                text = block.get("text")
+                if isinstance(text, str):
+                    parts.append(text)
     if not parts:
         raise ValueError("The Responses API response did not contain text output.")
     return "".join(parts)
+
+
+def _is_object(value: object) -> TypeGuard[dict[str, object]]:
+    return isinstance(value, dict)
+
+
+def _is_list(value: object) -> TypeGuard[list[object]]:
+    return isinstance(value, list)
 
 
 def build_payload(

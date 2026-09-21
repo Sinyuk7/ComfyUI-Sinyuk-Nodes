@@ -1,5 +1,10 @@
 """ComfyUI nodes for GarmentAnalysis schemas and prompt compilation."""
 
+# ComfyUI's current V3 stubs type ``execute`` as synchronous ``**kwargs``;
+# runtime dispatch also supports typed async signatures used by these nodes.
+# The mismatch is external to this package and is isolated at this adapter boundary.
+# pyright: reportIncompatibleMethodOverride=false
+
 from __future__ import annotations
 
 from sinyuk_nodes.compat.comfy import io

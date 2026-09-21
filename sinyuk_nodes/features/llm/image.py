@@ -53,8 +53,7 @@ def _to_pil(image: torch.Tensor, index: int) -> Image.Image:
 
     pixel_array = (pixels.clamp(0, 1).numpy() * 255).round().astype(np.uint8)
     if pixel_array.shape[-1] == 1:
-        pixel_array = np.repeat(pixel_array, 3, axis=-1)
-        return Image.fromarray(pixel_array, mode="RGB")
+        return Image.fromarray(pixel_array[..., 0], mode="L").convert("RGB")
     if pixel_array.shape[-1] == 4:
         return Image.fromarray(pixel_array, mode="RGBA")
     return Image.fromarray(pixel_array, mode="RGB")
