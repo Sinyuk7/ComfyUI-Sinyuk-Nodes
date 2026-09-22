@@ -7,6 +7,8 @@ import importlib.util
 from pathlib import Path
 
 from sinyuk_nodes.extension import SinyukNodesExtension, comfy_entrypoint
+from sinyuk_nodes.nodes.garment_prompt_compiler import GarmentAnalysisContextNode
+from sinyuk_nodes.nodes.llm.chat import LLMAPINode
 from sinyuk_nodes.registry import ALL_NODES, get_node_list
 
 
@@ -14,7 +16,7 @@ def test_registry_is_explicit() -> None:
     assert [node.__name__ for node in ALL_NODES] == [
         "OpenAPIConfigNode",
         "JSONSchemaNode",
-        "GarmentAnalysisSchemaNode",
+        "GarmentAnalysisContextNode",
         "GarmentPromptCompiler",
         "LLMAPINode",
     ]
@@ -39,3 +41,28 @@ def test_root_entrypoint_is_discoverable() -> None:
 
     assert module.__version__ == "0.1.0"
     assert callable(module.comfy_entrypoint)
+
+
+def test_garment_analysis_context_node_returns_protocol_outputs() -> None:
+    schema = GarmentAnalysisContextNode.define_schema()
+    schema.validate()
+    output = GarmentAnalysisContextNode.execute()
+
+    assert len(output.result) == 3
+    assert output.result[0]
+    assert output.result[1]
+    assert output.result[2].name == "garment_analysis"
+
+
+def test_llm_api_schema_groups_prompts_before_structured_output_options() -> None:
+    inputs = LLMAPINode.define_schema().inputs
+
+    assert [input.id for input in inputs[:6]] == [
+        "api_config",
+        "system_prompt",
+        "prompt",
+        "response_format",
+        "json_schema",
+        "images",
+    ]
+    assert inputs[2].display_name == "User Prompt"

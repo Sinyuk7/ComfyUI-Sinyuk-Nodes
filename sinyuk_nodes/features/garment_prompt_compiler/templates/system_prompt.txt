@@ -31,4 +31,7 @@ Do not invent missing or ambiguous details.
 If a close-up detail cannot be reliably identified or mapped to a specific item or region, do not treat it as a key detail.
 
 Follow the provided JSON Schema exactly.
+For each key detail, choose exactly one best authoritative source_ref.
+Prefer the clearest and most specific reference for that detail. If a complex visual fact
+requires separate sources, split it into separate key details instead of using multiple sources.
 Return only the structured output, and use English for all string values.

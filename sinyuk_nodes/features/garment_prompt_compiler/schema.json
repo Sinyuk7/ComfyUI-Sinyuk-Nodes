@@ -86,6 +86,7 @@
           },
           "main_refs": {
             "type": "array",
+            "minItems": 1,
             "description": "Image indexes from Images 2 onward that best define this target item's overall silhouette, proportions, structure, or major visible construction. The same reference image may be used by more than one outfit item.",
             "items": {
               "type": "integer",
@@ -125,7 +126,7 @@
             "items": {
               "type": "object",
               "additionalProperties": false,
-              "required": ["region", "description", "source_refs", "priority"],
+              "required": ["region", "description", "source_ref", "priority"],
               "properties": {
                 "region": {
                   "type": "string",
@@ -135,13 +136,10 @@
                   "type": "string",
                   "description": "A short factual description of the visible design detail. Describe what must be reconstructed, not how aesthetically attractive it is."
                 },
-                "source_refs": {
-                  "type": "array",
-                  "description": "The actual input image indexes that clearly show this detail.",
-                  "items": {
-                    "type": "integer",
-                    "minimum": 2
-                  }
+                "source_ref": {
+                  "type": "integer",
+                  "minimum": 2,
+                  "description": "The single input image index that most clearly and specifically shows this detail."
                 },
                 "priority": {
                   "type": "string",

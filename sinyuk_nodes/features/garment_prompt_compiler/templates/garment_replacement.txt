@@ -4,8 +4,6 @@ Preserve the person's identity, face, hairstyle, body proportions, pose, camera 
 Replace the current outfit completely with the target outfit defined by Images 2 and onward.
 The clothing currently worn in Image 1 is not a target reference and must not be preserved.
 
-${reference_assignment}
-
 ${outfit_items}
 
 Subject context:
@@ -13,7 +11,7 @@ ${subject_context}
 
 Adapt the target outfit naturally to the fixed subject and pose.
 Preserve the intended silhouette, structure, volume, drape, and important details of each item.
-Allow only folds, compression, overlap, and deformation naturally required by the pose and fabric behavior.
+Use natural folds, compression, overlap, and deformation consistent with the pose, fabric behavior, and motion.
 
 Favor a clean, dimensional, well-shaped presentation with clear garment structure and minimal unnecessary wrinkling or collapse.
 

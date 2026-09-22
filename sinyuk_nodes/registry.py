@@ -7,7 +7,7 @@ their classes from this module instead of relying on import-time discovery.
 from __future__ import annotations
 
 from .compat.comfy import io
-from .nodes.garment_prompt_compiler import GarmentAnalysisSchemaNode, GarmentPromptCompiler
+from .nodes.garment_prompt_compiler import GarmentAnalysisContextNode, GarmentPromptCompiler
 from .nodes.llm.chat import LLMAPINode
 from .nodes.llm.config import OpenAPIConfigNode
 from .nodes.llm.schema import JSONSchemaNode
@@ -16,7 +16,7 @@ from .nodes.llm.schema import JSONSchemaNode
 ALL_NODES: list[type[io.ComfyNode]] = [
     OpenAPIConfigNode,
     JSONSchemaNode,
-    GarmentAnalysisSchemaNode,
+    GarmentAnalysisContextNode,
     GarmentPromptCompiler,
     LLMAPINode,
 ]

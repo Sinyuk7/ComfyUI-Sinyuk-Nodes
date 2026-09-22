@@ -44,9 +44,16 @@ def _execution_summary(
     schema_name = json_schema.name if json_schema is not None else "-"
     token_limit = str(max_tokens) if max_tokens is not None else "-"
     return (
-        f"api={api} mdl={config.model} fmt={fmt} sch={schema_name} "
-        f"img={image_count} det={image_detail} max={token_limit} "
-        f"cache={cache} ms={elapsed_ms} out={len(response)}"
+        "### Execution Summary\n\n"
+        f"- **API:** `{api}`\n"
+        f"- **Model:** `{config.model}`\n"
+        f"- **Response format:** `{fmt}`\n"
+        f"- **JSON Schema:** `{schema_name}`\n"
+        f"- **Images:** `{image_count}` (`{image_detail}` detail)\n"
+        f"- **Max tokens:** `{token_limit}`\n"
+        f"- **Cache:** `{cache}`\n"
+        f"- **Elapsed:** `{elapsed_ms} ms`\n"
+        f"- **Output length:** `{len(response)}` characters"
     )
 
 

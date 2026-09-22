@@ -2,6 +2,16 @@
 
 from __future__ import annotations
 
-from .compiler import compile_prompt, load_garment_analysis_schema
+from .compiler import (
+    GarmentAnalysisContext,
+    compile_prompt,
+    load_garment_analysis_context,
+    load_garment_analysis_schema,
+)
 
-__all__ = ["compile_prompt", "load_garment_analysis_schema"]
+__all__ = [
+    "GarmentAnalysisContext",
+    "compile_prompt",
+    "load_garment_analysis_context",
+    "load_garment_analysis_schema",
+]

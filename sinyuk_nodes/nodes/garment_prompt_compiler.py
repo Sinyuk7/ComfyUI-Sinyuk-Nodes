@@ -10,28 +10,35 @@ from __future__ import annotations
 from sinyuk_nodes.compat.comfy import io
 from sinyuk_nodes.features.garment_prompt_compiler import (
     compile_prompt,
-    load_garment_analysis_schema,
+    load_garment_analysis_context,
 )
 
 from .llm.schema import JSON_SCHEMA
 
 
-class GarmentAnalysisSchemaNode(io.ComfyNode):
-    """Provide the bundled GarmentAnalysis schema to an upstream LLM node."""
+class GarmentAnalysisContextNode(io.ComfyNode):
+    """Provide the complete Garment Analysis protocol to an upstream LLM node."""
 
     @classmethod
     def define_schema(cls) -> io.Schema:
         return io.Schema(
-            node_id="Sinyuk.GarmentAnalysisSchema",
-            display_name="Garment Analysis Schema",
+            node_id="Sinyuk.GarmentAnalysisContext",
+            display_name="Garment Analysis Context",
             category="Sinyuk/Garment",
-            description="Provide the bundled GarmentAnalysis JSON Schema to an LLM API node.",
-            outputs=[JSON_SCHEMA.Output("schema", display_name="JSON Schema")],
+            description=(
+                "Provide the system prompt, user prompt, and JSON Schema for garment analysis."
+            ),
+            outputs=[
+                io.String.Output("system_prompt", display_name="System Prompt"),
+                io.String.Output("user_prompt", display_name="User Prompt"),
+                JSON_SCHEMA.Output("schema", display_name="JSON Schema"),
+            ],
         )
 
     @classmethod
     def execute(cls) -> io.NodeOutput:
-        return io.NodeOutput(load_garment_analysis_schema())
+        context = load_garment_analysis_context()
+        return io.NodeOutput(context.system_prompt, context.user_prompt, context.schema)
 
 
 class GarmentPromptCompiler(io.ComfyNode):
@@ -70,4 +77,4 @@ class GarmentPromptCompiler(io.ComfyNode):
         return io.NodeOutput(compile_prompt(analysis_json, extra_prompt))
 
 
-__all__ = ["GarmentAnalysisSchemaNode", "GarmentPromptCompiler"]
+__all__ = ["GarmentAnalysisContextNode", "GarmentPromptCompiler"]

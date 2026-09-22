@@ -49,14 +49,8 @@ class LLMAPINode(io.ComfyNode):
                     "prompt",
                     default="",
                     multiline=True,
-                    display_name="Prompt",
+                    display_name="User Prompt",
                     tooltip="User prompt sent to the model.",
-                ),
-                io.Image.Input(
-                    "images",
-                    display_name="Images",
-                    tooltip="Optional input images for a vision-capable model.",
-                    optional=True,
                 ),
                 io.Combo.Input(
                     "response_format",
@@ -71,6 +65,12 @@ class LLMAPINode(io.ComfyNode):
                     "json_schema",
                     display_name="JSON Schema",
                     tooltip="Connect a validated JSON Schema node when using JSON Schema format.",
+                    optional=True,
+                ),
+                io.Image.Input(
+                    "images",
+                    display_name="Images",
+                    tooltip="Optional input images for a vision-capable model.",
                     optional=True,
                 ),
                 io.Int.Input(
@@ -134,7 +134,7 @@ class LLMAPINode(io.ComfyNode):
                 io.String.Output(
                     "execution_summary",
                     display_name="Execution Summary",
-                    tooltip="Compact node-side request and response diagnostics.",
+                    tooltip="Markdown-formatted node-side request and response diagnostics.",
                 ),
             ],
         )
