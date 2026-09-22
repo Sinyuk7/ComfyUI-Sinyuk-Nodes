@@ -3,18 +3,14 @@
   "additionalProperties": false,
   "required": ["schema_version", "subject", "garments"],
   "properties": {
-    "schema_version": {
-      "type": "string",
-      "enum": ["1.0"]
-    },
+    "schema_version": { "type": "string", "enum": ["2.0"] },
     "subject": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["crop", "pose", "view", "notes"],
+      "required": ["crop", "pose", "view", "notes", "styling"],
       "properties": {
         "crop": {
           "type": "string",
-          "description": "The visible body framing in Image 1. This describes how much of the subject is included in the frame, not the subject's orientation.",
           "enum": [
             "full_body",
             "three_quarter_body",
@@ -22,11 +18,11 @@
             "bust_up",
             "close_up",
             "lower_body"
-          ]
+          ],
+          "description": "Visible body framing in Image 1."
         },
         "pose": {
           "type": "string",
-          "description": "The subject's primary whole-body pose. Use the closest broad category and describe important variations such as raised arms, crossed legs, leaning, hand placement, or unusual limb positions in notes.",
           "enum": [
             "standing",
             "walking",
@@ -37,11 +33,11 @@
             "lying",
             "dynamic",
             "other"
-          ]
+          ],
+          "description": "Primary whole-body pose; variations belong in notes."
         },
         "view": {
           "type": "string",
-          "description": "The dominant torso and body orientation relative to the camera. Base this on the body rather than facial direction. Camera elevation and perspective belong in notes.",
           "enum": [
             "front",
             "three_quarter_front",
@@ -49,102 +45,77 @@
             "three_quarter_back",
             "back",
             "mixed"
-          ]
+          ],
+          "description": "Dominant torso orientation relative to camera."
         },
         "notes": {
           "type": "string",
-          "description": "Brief context that materially affects outfit reconstruction but is not represented by crop, pose, or view: body lean, raised or crossed limbs, hand placement, body-related occlusion, camera elevation or perspective when clearly relevant, wind or visible motion, floor or chair contact, and other pose-specific effects on garment presentation. Ignore the clothing currently worn in Image 1. Do not guess an exact focal length. Use an empty string if there is nothing important to add."
+          "description": "Brief pose, crop, limb, contact, occlusion, perspective, motion, or floor/chair context. Do not describe styling or the original clothing. Empty string when none."
+        },
+        "styling": {
+          "type": "string",
+          "description": "A concise compatible styling prior from Image 1: visible layering, tuck or overlap, sleeve treatment, waist relationship, accessory placement, or relaxed/structured wearing logic. Never target garment identity, category, color, print, logo, exact construction, hidden details, background, lighting, or photographic style. Empty string when none."
         }
       }
     },
     "garments": {
       "type": "array",
-      "description": "All target outfit items intentionally shown in Images 2 and onward, including garments, footwear, bags, belts, hats, and other visible accessories.",
       "minItems": 1,
+      "description": "Target outfit items shown in Images 2 onward, including garments, footwear, bags, belts, hats, and accessories.",
       "items": {
         "type": "object",
         "additionalProperties": false,
         "required": [
-          "id",
           "category",
           "main_refs",
-          "detail_refs",
           "shape",
           "fabric_behavior",
           "presentation",
-          "must_preserve",
           "key_details"
         ],
         "properties": {
-          "id": {
-            "type": "string",
-            "description": "A stable sequential item identifier, for example garment_01 or garment_02."
-          },
           "category": {
             "type": "string",
-            "description": "Use a concise, recognizable English category for the target item, such as shirt, blouse, jacket, coat, knit_top, pants, skirt, dress, shorts, shoes, boots, belt, bag, hat, scarf, or accessory. Avoid 'other' when a more specific category can be identified."
+            "description": "Concise recognizable English item category."
           },
           "main_refs": {
             "type": "array",
             "minItems": 1,
-            "description": "Image indexes from Images 2 onward that best define this target item's overall silhouette, proportions, structure, or major visible construction. The same reference image may be used by more than one outfit item.",
-            "items": {
-              "type": "integer",
-              "minimum": 2
-            }
-          },
-          "detail_refs": {
-            "type": "array",
-            "description": "Image indexes that provide useful additional local information for this item, such as neckline, buttons, logo, zipper, slit, hardware, fabric construction, shoe details, or other clearly identifiable features. Use an empty array when no additional detail reference is useful.",
-            "items": {
-              "type": "integer",
-              "minimum": 2
-            }
+            "description": "Images defining overall silhouette, proportions, structure, or major construction.",
+            "items": { "type": "integer", "minimum": 2 }
           },
           "shape": {
             "type": "string",
-            "description": "The target item's intrinsic silhouette and structural form. Describe only design-defining shape information such as overall proportion, volume, shoulder line, bodice shape, waist placement, skirt shape, leg width, hem shape, shoe silhouette, or other major construction cues. Do not describe pose-induced folds, wind, temporary deformation, or styling inherited from Image 1."
+            "description": "Intrinsic design silhouette and structural form: proportion, volume, shoulder, bodice, waist, skirt/leg, hem, shoe silhouette, or major construction. Exclude pose folds, temporary deformation, Image 1 styling, and details better represented in key_details."
           },
           "fabric_behavior": {
             "type": "string",
-            "description": "Describe how the item's visible material should physically behave when worn or moved, focusing on qualities such as crispness, softness, stretch, structure, fluidity, volume retention, drape, cling, and fold behavior. Describe visible behavior rather than guessing exact fiber composition unless it is clearly evident."
+            "description": "Visible material behavior when worn or moved: crispness, softness, stretch, structure, fluidity, volume retention, drape, cling, and fold behavior."
           },
           "presentation": {
             "type": "string",
-            "description": "Describe how this target item should be worn and presented on the specific subject pose, crop, view, and visible motion to best showcase its intended silhouette, structure, volume, drape, and important details. Favor a clean, dimensional, well-shaped result with controlled natural folds. Allow appropriate tuck, layering, spreading, compression, or subtle motion when it improves presentation and is consistent with the target references and subject pose. Do not inherit styling or layering from the clothing originally worn in Image 1, and do not force naturally hidden details to become visible."
-          },
-          "must_preserve": {
-            "type": "array",
-            "description": "Only design-defining structural regions or features whose alteration would noticeably change the identity or construction of the target item, such as collar shape, shoulder structure, waistband, placket, pocket placement, waist seam, slit position, leg silhouette, shoe shape, or distinctive construction. Do not use this field for ordinary color or generic appearance unless it is genuinely design-defining.",
-            "items": {
-              "type": "string"
-            }
+            "description": "How this target item is worn within the fixed subject pose, crop, view, and occlusion, including compatible layering, overlap, tuck, sleeve, waist, accessory, contact, and natural folds. Do not repeat shape or identity, or change pose/crop to reveal hidden details."
           },
           "key_details": {
             "type": "array",
-            "description": "Clearly identifiable details that materially improve reconstruction fidelity. Include distinctive logos, graphics, stripe or pattern alignment, embroidery, buttons, zippers, pockets, slits, trims, buckles, hardware, shoe construction, or similar features. Exclude tiny ambiguous details that cannot be reliably identified or mapped, and avoid generic information already obvious from the reference image unless it is design-defining.",
+            "description": "Materially useful, clearly visible, source-grounded details beyond shape, ordered most important to least important. Omit generic, tiny, ambiguous, or invisible details.",
             "items": {
               "type": "object",
               "additionalProperties": false,
-              "required": ["region", "description", "source_ref", "priority"],
+              "required": ["region", "description", "source_ref"],
               "properties": {
                 "region": {
                   "type": "string",
-                  "description": "A short English semantic location for the detail, such as overall, left_chest, collar, cuff, waistband, front_placket, pocket, side_hem, zipper_area, footwear, bag_front, or buckle."
+                  "description": "Semantic location such as overall, collar, cuff, waistband, pocket, hem, footwear, bag_front, or buckle. Use overall only for all-over patterns, stripes, color blocking, broad panel arrangement, or distinctive whole-item layout."
                 },
                 "description": {
                   "type": "string",
-                  "description": "A short factual description of the visible design detail. Describe what must be reconstructed, not how aesthetically attractive it is."
+                  "description": "Factual source-grounded detail to reconstruct, beyond the item's shape."
                 },
                 "source_ref": {
                   "type": "integer",
                   "minimum": 2,
-                  "description": "The single input image index that most clearly and specifically shows this detail."
-                },
-                "priority": {
-                  "type": "string",
-                  "description": "critical: losing or changing this detail would materially change the item's identity. important: a meaningful design or construction detail that should be preserved when visible. supporting: useful secondary information that should not override silhouette, structure, or higher-priority details.",
-                  "enum": ["critical", "important", "supporting"]
+                  "description": "Exactly one clearest authoritative image for this detail; split facts into separate details when they require different sources."
                 }
               }
             }

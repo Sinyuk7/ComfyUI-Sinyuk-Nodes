@@ -38,6 +38,20 @@ Templates = Prompt 表达结构
 Image Model = 执行最终换装
 ```
 
-Image 1 只提供人物、姿势、构图和视角；Images 2..N 定义完整目标 outfit，包括服装、鞋、包、腰带等。
+Image 1 是固定主体锚点，同时可以作为兼容的 styling prior：它提供人物身份、姿势、构图、视角、四肢位置、接触点和自然遮挡，也可以在不与目标服装冲突时提示叠穿关系、塞入状态、袖口处理、腰部关系和配件摆放。Image 1 的原服装不是目标服装身份参考。
+Images 2..N 定义目标 outfit 的身份、类别、版型、结构、颜色、图案、材质和具体细节，包括服装、鞋、包、腰带等。
 
-Reference 应遵循“最小充分引用”：整体版型使用必要的 main reference，具体局部细节使用最清晰、最权威的 detail reference，避免无意义的多图交叉引用。
+优先级必须保持：
+
+```text
+Image 1 主体几何与构图
+→ Images 2..N 的目标服装身份与结构
+→ Image 1 的兼容 styling prior
+→ 立体、自然、物理一致的服装表现
+```
+
+不要为了展示隐藏的衣物、下摆、鞋、配件或局部细节而改变 Image 1 的姿势、四肢位置、接触点、遮挡、服装覆盖、裁切或构图。Image 1 的背景、灯光和摄影环境默认不继承。
+
+Reference 应遵循“最小充分引用”：整体版型使用必要的 `main_refs`，具体局部细节在 `key_details[].source_ref` 中绑定一个最清晰、最权威的来源；compiler 会从这些 source_ref 确定性派生补充细节引用，不再维护独立的 `detail_refs`。避免无意义的多图交叉引用。
+
+V2 协议删除 `id`、`must_preserve` 和 `priority`。`shape` 表达固有版型结构，`key_details` 按重要性顺序表达超出 shape 的显著细节，`subject.styling` 仅承载 Image 1 的兼容穿搭先验。

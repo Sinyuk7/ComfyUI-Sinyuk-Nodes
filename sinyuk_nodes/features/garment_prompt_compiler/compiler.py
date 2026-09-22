@@ -10,25 +10,19 @@ from typing import TypedDict, TypeGuard
 
 from sinyuk_nodes.features.llm.schema import JSONSchemaDocument, parse_json_schema
 
-_PRIORITY_RANK = {"critical": 0, "important": 1, "supporting": 2}
-
 
 class _KeyDetail(TypedDict):
     region: str
     description: str
     source_ref: int
-    priority: str
 
 
 class _Garment(TypedDict):
-    id: str
     category: str
     main_refs: list[int]
-    detail_refs: list[int]
     shape: str
     fabric_behavior: str
     presentation: str
-    must_preserve: list[str]
     key_details: list[_KeyDetail]
 
 
@@ -37,6 +31,7 @@ class _Subject(TypedDict):
     pose: str
     view: str
     notes: str
+    styling: str
 
 
 class _Analysis(TypedDict):
@@ -114,6 +109,14 @@ def _require_object(value: object, path: str) -> dict[str, object]:
     return result
 
 
+def _reject_unknown(value: dict[str, object], allowed: set[str], path: str) -> None:
+    unknown = sorted(set(value) - allowed)
+    if unknown:
+        raise ValueError(
+            f"Invalid GarmentAnalysis JSON: {path} has unsupported field(s): {', '.join(unknown)}."
+        )
+
+
 def _require_int_list(value: object, path: str) -> list[int]:
     values = _require_list(value, path)
     if not all(isinstance(item, int) and not isinstance(item, bool) for item in values):
@@ -127,40 +130,34 @@ def _require_int_list(value: object, path: str) -> list[int]:
 def _parse_detail(value: object, index: int, garment_index: int) -> _KeyDetail:
     path = f"garments[{garment_index}].key_details[{index}]"
     value_dict = _require_object(value, path)
-    priority = _require_string(value_dict.get("priority"), f"{path}.priority")
-    if priority not in _PRIORITY_RANK:
-        raise ValueError(f"Invalid GarmentAnalysis JSON: {path}.priority is unsupported.")
+    _reject_unknown(value_dict, {"region", "description", "source_ref"}, path)
     return {
         "region": _require_string(value_dict.get("region"), f"{path}.region"),
         "description": _require_string(value_dict.get("description"), f"{path}.description"),
         "source_ref": _require_int(value_dict.get("source_ref"), f"{path}.source_ref"),
-        "priority": priority,
     }
 
 
 def _parse_garment(value: object, index: int) -> _Garment:
     path = f"garments[{index}]"
     value_dict = _require_object(value, path)
+    _reject_unknown(
+        value_dict,
+        {"category", "main_refs", "shape", "fabric_behavior", "presentation", "key_details"},
+        path,
+    )
     details = _require_list(value_dict.get("key_details"), f"{path}.key_details")
     main_refs = _require_int_list(value_dict.get("main_refs"), f"{path}.main_refs")
     if not main_refs:
         raise ValueError(f"Invalid GarmentAnalysis JSON: {path}.main_refs cannot be empty.")
     return {
-        "id": _require_string(value_dict.get("id"), f"{path}.id"),
         "category": _require_string(value_dict.get("category"), f"{path}.category"),
         "main_refs": main_refs,
-        "detail_refs": _require_int_list(value_dict.get("detail_refs"), f"{path}.detail_refs"),
         "shape": _require_string(value_dict.get("shape"), f"{path}.shape"),
         "fabric_behavior": _require_string(
             value_dict.get("fabric_behavior"), f"{path}.fabric_behavior"
         ),
         "presentation": _require_string(value_dict.get("presentation"), f"{path}.presentation"),
-        "must_preserve": [
-            _require_string(item, f"{path}.must_preserve[{item_index}]")
-            for item_index, item in enumerate(
-                _require_list(value_dict.get("must_preserve"), f"{path}.must_preserve")
-            )
-        ],
         "key_details": [
             _parse_detail(item, item_index, index) for item_index, item in enumerate(details)
         ],
@@ -173,10 +170,12 @@ def _parse_analysis(raw: str) -> _Analysis:
     except json.JSONDecodeError as exc:
         raise ValueError("Invalid GarmentAnalysis JSON: malformed JSON.") from exc
     value_dict = _require_object(value, "root")
+    _reject_unknown(value_dict, {"schema_version", "subject", "garments"}, "root")
     schema_version = _require_string(value_dict.get("schema_version"), "schema_version")
-    if schema_version != "1.0":
-        raise ValueError("Invalid GarmentAnalysis JSON: schema_version must be '1.0'.")
+    if schema_version != "2.0":
+        raise ValueError("Invalid GarmentAnalysis JSON: schema_version must be '2.0'.")
     subject_value = _require_object(value_dict.get("subject"), "subject")
+    _reject_unknown(subject_value, {"crop", "pose", "view", "notes", "styling"}, "subject")
     crop = _require_string(subject_value.get("crop"), "subject.crop")
     pose = _require_string(subject_value.get("pose"), "subject.pose")
     view = _require_string(subject_value.get("view"), "subject.view")
@@ -208,6 +207,7 @@ def _parse_analysis(raw: str) -> _Analysis:
         "pose": pose,
         "view": view,
         "notes": _require_string(subject_value.get("notes"), "subject.notes"),
+        "styling": _require_string(subject_value.get("styling"), "subject.styling"),
     }
     garments = _require_list(value_dict.get("garments"), "garments")
     if not garments:
@@ -229,7 +229,12 @@ def _format_refs(refs: list[int]) -> str:
 def _render_subject(subject: _Subject) -> str:
     result = f"Crop: {subject['crop']}. Pose: {subject['pose']}. View: {subject['view']}."
     notes = subject["notes"].strip()
-    return f"{result} Pose and visibility notes: {notes}" if notes else result
+    styling = subject["styling"].strip()
+    if notes:
+        result += f" Pose and visibility notes: {notes}"
+    if styling:
+        result += f" Compatible styling context: {styling}"
+    return result
 
 
 def _render_item_title(index: int, garment: _Garment) -> str:
@@ -238,23 +243,22 @@ def _render_item_title(index: int, garment: _Garment) -> str:
 
 
 def _render_item(index: int, garment: _Garment) -> str:
-    details = sorted(garment["key_details"], key=lambda item: _PRIORITY_RANK[item["priority"]])
     detail_lines = [
-        f"- {detail['priority'].capitalize()} — {detail['region']} — "
+        f"- {detail['region']} — "
         f"Image {detail['source_ref']}: {detail['description'].strip().rstrip('.。')}."
-        for detail in details
+        for detail in garment["key_details"]
     ]
     key_details = "\n".join(detail_lines) if detail_lines else "No additional key details."
-    preserve = (
-        "; ".join(item.strip().rstrip(".。") for item in garment["must_preserve"]) + "."
-        if garment["must_preserve"]
-        else "No additional preserve-critical features."
-    )
-    references = f"Use {_format_refs(garment['main_refs'])} as the main reference."
-    if garment["detail_refs"]:
-        references += (
-            f" Use {_format_refs(garment['detail_refs'])} as additional detail reference(s)."
-        )
+    detail_refs: list[int] = []
+    for detail in garment["key_details"]:
+        ref = detail["source_ref"]
+        if ref not in garment["main_refs"] and ref not in detail_refs:
+            detail_refs.append(ref)
+    main_label = "reference" if len(garment["main_refs"]) == 1 else "references"
+    references = f"Use {_format_refs(garment['main_refs'])} as the main {main_label}."
+    if detail_refs:
+        detail_label = "reference" if len(detail_refs) == 1 else "references"
+        references += f" Use {_format_refs(detail_refs)} as additional detail {detail_label}."
     return (
         Template(_asset("templates/outfit_item.txt"))
         .safe_substitute(
@@ -262,7 +266,6 @@ def _render_item(index: int, garment: _Garment) -> str:
             references=references,
             shape=garment["shape"],
             fabric_behavior=garment["fabric_behavior"],
-            must_preserve=preserve,
             key_details=key_details,
             presentation=garment["presentation"],
         )

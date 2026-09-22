@@ -1,8 +1,21 @@
 Use Image 1 as the fixed base subject.
-Preserve the person's identity, face, hairstyle, body proportions, pose, camera view, framing, crop, and subject scale.
+Preserve the person's identity, face, hairstyle, body proportions, pose, camera view, framing, crop, subject scale,
+limb positions, contact points, and natural occlusion exactly.
 
 Replace the current outfit completely with the target outfit defined by Images 2 and onward.
-The clothing currently worn in Image 1 is not a target reference and must not be preserved.
+Images 2 and onward define the target garments' identity, category, silhouette, construction, colors, patterns,
+materials, accessories, and source-grounded details.
+
+The clothing in Image 1 is not authoritative for target garment identity, category, color, print, logo,
+exact construction, or exact detail placement. When compatible with the target outfit, use Image 1 only as
+a light styling prior for layering logic, overlap or tuck state, sleeve treatment, waist relationship,
+accessory placement, and overall outfit coherence. Do not copy its original garment identity or exact details.
+
+Priority order:
+1. Preserve Image 1 subject geometry and composition.
+2. Replace the outfit according to Images 2 onward.
+3. Within those constraints, retain compatible styling relationships from Image 1.
+4. Render physically coherent, dimensional garments.
 
 ${outfit_items}
 
@@ -10,10 +23,15 @@ Subject context:
 ${subject_context}
 
 Adapt the target outfit naturally to the fixed subject and pose.
-Preserve the intended silhouette, structure, volume, drape, and important details of each item.
+Do not change the pose, limb positions, contact points, garment coverage, natural occlusion, framing, or crop
+to reveal hidden garments, hems, shoes, accessories, or details.
+Preserve the intended visible silhouette, structure, volume, drape, and important details of each target item.
 Use natural folds, compression, overlap, and deformation consistent with the pose, fabric behavior, and motion.
 
-Favor a clean, dimensional, well-shaped presentation with clear garment structure and minimal unnecessary wrinkling or collapse.
+Render each garment as a three-dimensional worn construction with readable shoulder, sleeve, waist, hem, overlap,
+and contact relationships. Make layering physically coherent: inner layers remain under outer layers, hems and cuffs
+overlap naturally, and waistbands, straps, and closures sit on the correct garment surface. Avoid pasted-on surfaces,
+collapsed fabric, random wrinkling, or artificially inflated volume.
 
 When appropriate for the garment type, fabric, pose, and framing, allow subtle natural motion that helps reveal shape, drape, and dimensionality. Keep the motion physically plausible and preserve the intended silhouette and important details.
 

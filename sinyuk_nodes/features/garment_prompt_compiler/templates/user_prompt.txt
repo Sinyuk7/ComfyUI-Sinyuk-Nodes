@@ -1,9 +1,13 @@
 
 Analyze the provided images for high-fidelity outfit replacement.
 
-Image 1 is the base subject.
-Images 2 and onward are target outfit references.
+Image 1 is the fixed subject anchor and a compatible styling anchor, but not a target garment identity reference.
+Images 2 and onward define the target outfit's identity and construction.
 
-Identify the subject context, outfit item grouping, main and detail references, shape, fabric behavior, must-preserve regions, useful key details, and pose-aware presentation.
+Identify the subject context, outfit item grouping, main references (with supplementary references derived from key_details.source_ref), shape, fabric behavior,
+useful source-grounded key details, and pose-aware presentation.
+Record only a small amount of stable styling context from Image 1 when it materially affects the whole outfit,
+such as a clearly visible layered arrangement, tucked waist, rolled sleeve treatment, or stable accessory placement.
+For each target item, describe how it can use compatible styling relationships without copying Image 1's garment identity.
 
 Focus only on information that will materially improve reconstruction quality. Keep the analysis concise, accurate, and non-speculative.
