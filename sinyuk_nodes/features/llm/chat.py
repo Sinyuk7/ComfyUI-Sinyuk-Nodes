@@ -135,13 +135,16 @@ def build_payload(
     user_content: str | list[dict[str, object]] = prompt
     if images:
         user_content = [{"type": "text", "text": prompt}]
-        user_content.extend(
-            {
-                "type": "image_url",
-                "image_url": {"url": image.base64_data_url, "detail": image_detail},
-            }
-            for image in images
-        )
+        for index, image in enumerate(images, start=1):
+            user_content.extend(
+                [
+                    {"type": "text", "text": f"Image {index}:"},
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": image.base64_data_url, "detail": image_detail},
+                    },
+                ]
+            )
     messages: list[dict[str, object]] = []
     if system_prompt.strip():
         messages.append({"role": "system", "content": system_prompt})
@@ -187,10 +190,17 @@ def build_responses_payload(
     content: str | list[dict[str, object]] = prompt
     if images:
         content = [{"type": "input_text", "text": prompt}]
-        content.extend(
-            {"type": "input_image", "image_url": image.base64_data_url, "detail": image_detail}
-            for image in images
-        )
+        for index, image in enumerate(images, start=1):
+            content.extend(
+                [
+                    {"type": "input_text", "text": f"Image {index}:"},
+                    {
+                        "type": "input_image",
+                        "image_url": image.base64_data_url,
+                        "detail": image_detail,
+                    },
+                ]
+            )
     input_items: list[dict[str, object]] = []
     if system_prompt.strip():
         input_items.append({"role": "system", "content": system_prompt})

@@ -101,6 +101,7 @@ def test_image_detail_is_sent_to_each_image() -> None:
             "role": "user",
             "content": [
                 {"type": "text", "text": "Describe this."},
+                {"type": "text", "text": "Image 1:"},
                 {
                     "type": "image_url",
                     "image_url": {"url": "data:image/jpeg;base64,abc", "detail": "low"},
@@ -174,7 +175,18 @@ def test_responses_payload_keeps_every_image_input() -> None:
     assert isinstance(input_items, list)
     content = input_items[0]["content"]
     assert isinstance(content, list)
-    assert [item["type"] for item in content[1:]] == ["input_image"] * 4
+    assert [item["type"] for item in content[1:]] == [
+        "input_text",
+        "input_image",
+        "input_text",
+        "input_image",
+        "input_text",
+        "input_image",
+        "input_text",
+        "input_image",
+    ]
+    assert content[1]["text"] == "Image 1:"
+    assert content[7]["text"] == "Image 4:"
 
 
 def test_schema_validation_requires_strict_object_properties() -> None:
