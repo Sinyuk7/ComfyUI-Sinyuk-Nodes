@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import httpx
 import pytest
+from comfy.model_management import InterruptProcessingException
+from sinyuk_nodes.features.llm import client
 from sinyuk_nodes.features.llm.chat import (
     _execution_summary,
     _response_text,
@@ -222,3 +225,28 @@ def test_execution_summary_is_markdown() -> None:
         "- **Elapsed:** `123 ms`\n"
         "- **Output length:** `2` characters"
     )
+
+
+@pytest.mark.anyio
+async def test_http_request_propagates_comfy_interrupt(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def handler(request: httpx.Request) -> httpx.Response:
+        await client.asyncio.sleep(1)
+        return httpx.Response(200, request=request)
+
+    calls = 0
+
+    def interrupt_after_first_check() -> None:
+        nonlocal calls
+        calls += 1
+        if calls > 1:
+            raise InterruptProcessingException()
+
+    monkeypatch.setattr(client, "check_interrupt", interrupt_after_first_check)
+    with pytest.raises(InterruptProcessingException):
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as http_client:
+            await client._request(
+                http_client,
+                "GET",
+                "https://example.test",
+                headers={},
+            )

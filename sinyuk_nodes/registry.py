@@ -7,6 +7,7 @@ their classes from this module instead of relying on import-time discovery.
 from __future__ import annotations
 
 from .compat.comfy import io
+from .nodes.aspect_ratio_resolution import AspectRatioResolutionNode
 from .nodes.garment_prompt_compiler import GarmentAnalysisContextNode, GarmentPromptCompiler
 from .nodes.llm.chat import LLMAPINode
 from .nodes.llm.config import OpenAPIConfigNode
@@ -14,6 +15,7 @@ from .nodes.llm.schema import JSONSchemaNode
 
 # Keep registration explicit so the published node surface remains reviewable.
 ALL_NODES: list[type[io.ComfyNode]] = [
+    AspectRatioResolutionNode,
     OpenAPIConfigNode,
     JSONSchemaNode,
     GarmentAnalysisContextNode,

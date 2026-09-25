@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import TypeGuard
 
 import httpx
+from sinyuk_nodes.compat.comfy import check_interrupt
 
 
 class OpenAPIRequestError(RuntimeError):
@@ -17,6 +18,7 @@ class OpenAPIRequestError(RuntimeError):
 
 _RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
 _ERROR_BODY_LIMIT = 500
+_INTERRUPT_POLL_INTERVAL = 0.1
 
 
 def _error_message(response: httpx.Response, api_key: str) -> str:
@@ -89,6 +91,42 @@ def _write_catalog(base_url: str, models: tuple[str, ...]) -> None:
     temporary.replace(path)
 
 
+async def _sleep_with_interrupt(delay: float) -> None:
+    """Wait between retries while keeping prompt cancellation responsive."""
+
+    remaining = delay
+    while remaining > 0:
+        check_interrupt()
+        interval = min(_INTERRUPT_POLL_INTERVAL, remaining)
+        await asyncio.sleep(interval)
+        remaining -= interval
+
+
+async def _request(
+    client: httpx.AsyncClient,
+    method: str,
+    url: str,
+    *,
+    headers: dict[str, str],
+    payload: dict[str, object] | None = None,
+) -> httpx.Response:
+    """Run one HTTP request and cancel its task when ComfyUI interrupts."""
+
+    check_interrupt()
+    request = asyncio.create_task(client.request(method, url, headers=headers, json=payload))
+    try:
+        while not request.done():
+            check_interrupt()
+            await asyncio.wait((request,), timeout=_INTERRUPT_POLL_INTERVAL)
+        check_interrupt()
+        return request.result()
+    except BaseException:
+        if not request.done():
+            request.cancel()
+        await asyncio.gather(request, return_exceptions=True)
+        raise
+
+
 async def fetch_models(base_url: str, api_key: str) -> tuple[str, ...]:
     """Fetch and persist model IDs from ``GET /models``."""
 
@@ -97,12 +135,17 @@ async def fetch_models(base_url: str, api_key: str) -> tuple[str, ...]:
     async with httpx.AsyncClient(timeout=httpx.Timeout(60.0, connect=15.0)) as client:
         for attempt in range(3):
             try:
-                response = await client.get(url, headers={"Authorization": f"Bearer {api_key}"})
+                response = await _request(
+                    client,
+                    "GET",
+                    url,
+                    headers={"Authorization": f"Bearer {api_key}"},
+                )
                 if response.status_code >= 400:
                     error = OpenAPIRequestError(_error_message(response, api_key))
                     if response.status_code in _RETRYABLE_STATUS_CODES and attempt < 2:
                         last_error = error
-                        await asyncio.sleep(0.5 * (attempt + 1))
+                        await _sleep_with_interrupt(0.5 * (attempt + 1))
                         continue
                     raise error
                 payload: object = response.json()
@@ -126,7 +169,7 @@ async def fetch_models(base_url: str, api_key: str) -> tuple[str, ...]:
             except (httpx.TimeoutException, httpx.NetworkError, OSError) as exc:
                 last_error = exc
                 if attempt < 2:
-                    await asyncio.sleep(0.5 * (attempt + 1))
+                    await _sleep_with_interrupt(0.5 * (attempt + 1))
                     continue
                 break
             except httpx.HTTPError as exc:
@@ -150,21 +193,25 @@ async def complete_chat(base_url: str, api_key: str, payload: dict[str, object])
     async with httpx.AsyncClient(timeout=httpx.Timeout(180.0, connect=15.0)) as client:
         for attempt in range(3):
             try:
-                response = await client.post(
-                    url, headers={"Authorization": f"Bearer {api_key}"}, json=payload
+                response = await _request(
+                    client,
+                    "POST",
+                    url,
+                    headers={"Authorization": f"Bearer {api_key}"},
+                    payload=payload,
                 )
                 if response.status_code >= 400:
                     error = OpenAPIRequestError(_error_message(response, api_key))
                     if response.status_code in _RETRYABLE_STATUS_CODES and attempt < 2:
                         last_error = error
-                        await asyncio.sleep(0.5 * (attempt + 1))
+                        await _sleep_with_interrupt(0.5 * (attempt + 1))
                         continue
                     raise error
                 return response.json()
             except (httpx.TimeoutException, httpx.NetworkError, OSError) as exc:
                 last_error = exc
                 if attempt < 2:
-                    await asyncio.sleep(0.5 * (attempt + 1))
+                    await _sleep_with_interrupt(0.5 * (attempt + 1))
                     continue
                 break
             except httpx.HTTPError as exc:
@@ -188,21 +235,25 @@ async def complete_response(base_url: str, api_key: str, payload: dict[str, obje
     async with httpx.AsyncClient(timeout=httpx.Timeout(180.0, connect=15.0)) as client:
         for attempt in range(3):
             try:
-                response = await client.post(
-                    url, headers={"Authorization": f"Bearer {api_key}"}, json=payload
+                response = await _request(
+                    client,
+                    "POST",
+                    url,
+                    headers={"Authorization": f"Bearer {api_key}"},
+                    payload=payload,
                 )
                 if response.status_code >= 400:
                     error = OpenAPIRequestError(_error_message(response, api_key))
                     if response.status_code in _RETRYABLE_STATUS_CODES and attempt < 2:
                         last_error = error
-                        await asyncio.sleep(0.5 * (attempt + 1))
+                        await _sleep_with_interrupt(0.5 * (attempt + 1))
                         continue
                     raise error
                 return response.json()
             except (httpx.TimeoutException, httpx.NetworkError, OSError) as exc:
                 last_error = exc
                 if attempt < 2:
-                    await asyncio.sleep(0.5 * (attempt + 1))
+                    await _sleep_with_interrupt(0.5 * (attempt + 1))
                     continue
                 break
             except httpx.HTTPError as exc:

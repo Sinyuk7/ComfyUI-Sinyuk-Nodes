@@ -14,6 +14,7 @@ from sinyuk_nodes.registry import ALL_NODES, get_node_list
 
 def test_registry_is_explicit() -> None:
     assert [node.__name__ for node in ALL_NODES] == [
+        "AspectRatioResolutionNode",
         "OpenAPIConfigNode",
         "JSONSchemaNode",
         "GarmentAnalysisContextNode",

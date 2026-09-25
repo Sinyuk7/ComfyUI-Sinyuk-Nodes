@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-from sinyuk_nodes.compat.comfy import ComfyAPI, io
+from sinyuk_nodes.compat.comfy import ComfyAPI, check_interrupt, io
 from sinyuk_nodes.features.llm.client import (
     OpenAPIRequestError,
     available_models,
@@ -94,6 +94,7 @@ class OpenAPIConfigNode(io.ComfyNode):
         model_input: str,
         model_selection: str,
     ) -> io.NodeOutput:
+        check_interrupt()
         if provider != "openapi":
             raise ValueError("Only the openapi provider is supported.")
         api_modes = {"Responses API": "responses", "Chat Completions": "chat_completions"}
@@ -113,6 +114,7 @@ class OpenAPIConfigNode(io.ComfyNode):
             )
         models = config.available_models
         if not models:
+            check_interrupt()
             await ComfyAPI().execution.set_progress(0, 1, node_id=str(cls.hidden.unique_id))
             try:
                 models = await fetch_models(config.base_url, config.api_key)
@@ -121,6 +123,7 @@ class OpenAPIConfigNode(io.ComfyNode):
                     raise
                 models = ()
             await ComfyAPI().execution.set_progress(1, 1, node_id=str(cls.hidden.unique_id))
+            check_interrupt()
             config = build_config(
                 api_key, base_url, model_input, model_selection, models, normalized_mode
             )

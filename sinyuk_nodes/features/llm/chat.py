@@ -10,6 +10,7 @@ from time import perf_counter
 from typing import TypeGuard
 
 import torch
+from sinyuk_nodes.compat.comfy import check_interrupt
 
 from .client import complete_chat, complete_response
 from .config import OpenAPIConfig
@@ -242,6 +243,7 @@ async def execute_chat(
     image_detail: str = "high",
 ) -> ChatResult:
     started = perf_counter()
+    check_interrupt()
     encoded = encode_images(images, image_detail)
     payload_builder = build_responses_payload if config.api_mode == "responses" else build_payload
     payload = payload_builder(
@@ -281,6 +283,7 @@ async def execute_chat(
         ).encode()
     ).hexdigest()
     if fingerprint in _RESPONSE_CACHE:
+        check_interrupt()
         _RESPONSE_CACHE.move_to_end(fingerprint)
         response = _RESPONSE_CACHE[fingerprint]
         return ChatResult(
@@ -301,6 +304,7 @@ async def execute_chat(
         result = _responses_text(await complete_response(config.base_url, config.api_key, payload))
     else:
         result = _response_text(await complete_chat(config.base_url, config.api_key, payload))
+    check_interrupt()
     _RESPONSE_CACHE[fingerprint] = result
     _RESPONSE_CACHE.move_to_end(fingerprint)
     while len(_RESPONSE_CACHE) > _CACHE_LIMIT:
