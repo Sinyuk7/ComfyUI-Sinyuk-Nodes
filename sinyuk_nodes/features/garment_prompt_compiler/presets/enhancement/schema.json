@@ -1,0 +1,149 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "subject",
+    "garments"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "enum": [
+        "2.0"
+      ]
+    },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "crop",
+        "pose",
+        "view",
+        "notes",
+        "styling"
+      ],
+      "properties": {
+        "crop": {
+          "type": "string",
+          "enum": [
+            "full_body",
+            "three_quarter_body",
+            "waist_up",
+            "bust_up",
+            "close_up",
+            "lower_body"
+          ],
+          "description": "Visible body framing in Image 1."
+        },
+        "pose": {
+          "type": "string",
+          "enum": [
+            "standing",
+            "walking",
+            "seated",
+            "kneeling",
+            "crouching",
+            "reclining",
+            "lying",
+            "dynamic",
+            "other"
+          ],
+          "description": "Primary whole-body pose; variations belong in notes."
+        },
+        "view": {
+          "type": "string",
+          "enum": [
+            "front",
+            "three_quarter_front",
+            "side",
+            "three_quarter_back",
+            "back",
+            "mixed"
+          ],
+          "description": "Dominant torso orientation relative to camera."
+        },
+        "notes": {
+          "type": "string",
+          "description": "Brief pose, crop, limb, contact, occlusion, perspective, motion, or floor/chair context. Do not describe styling or the original clothing. Empty string when none."
+        },
+        "styling": {
+          "type": "string",
+          "description": "Cross-item wearing relationships in Image 1 to preserve, such as layering, tuck, overlap and overall accessory placement. Empty string when unnecessary. Do not repeat item-specific presentation or prescribe restyling."
+        }
+      }
+    },
+    "garments": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Clearly intended reference items for refinement or supplementation. Exclude incidental styling props. An occluded or cropped item is not necessarily missing. One entry per intended item; merge references belonging to the same item.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "category",
+          "main_refs",
+          "shape",
+          "fabric_behavior",
+          "presentation",
+          "key_details"
+        ],
+        "properties": {
+          "category": {
+            "type": "string",
+            "description": "Concise recognizable English item category."
+          },
+          "main_refs": {
+            "type": "array",
+            "minItems": 1,
+            "description": "Minimum sufficient references establishing item identity and structural context. References start at Image 2. Do not repeat image numbers.",
+            "items": {
+              "type": "integer",
+              "minimum": 2
+            }
+          },
+          "shape": {
+            "type": "string",
+            "description": "Concise intrinsic structure for recognizing the reference item. For existing items this is context, not an instruction to reshape Image 1's overall silhouette or volume. For a genuinely missing intended item, this structure may guide construction."
+          },
+          "fabric_behavior": {
+            "type": "string",
+            "description": "Reliable material texture, weave, drape, stiffness, roughness and reflective behavior. Express material properties, not reference lighting; render under Image 1's illumination."
+          },
+          "presentation": {
+            "type": "string",
+            "description": "Only useful item-specific wearing or integration information not already in subject.styling; empty string when unnecessary. For a clearly missing intended item, describe a plausible wearing or carrying relationship within the fixed pose and crop. Do not prescribe addition if presence is uncertain, invent supports, change gestures, or specify coordinates, angles or strap paths. Leave exact placement to the image model."
+          },
+          "key_details": {
+            "type": "array",
+            "description": "Useful, clearly supported reference characteristics ordered by importance, not a list of faults in Image 1. Omit ambiguous facts and redundant shape descriptions.",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "region",
+                "description",
+                "source_ref"
+              ],
+              "properties": {
+                "region": {
+                  "type": "string",
+                  "description": "Semantic location such as overall, collar, cuff, waistband, pocket, hem, footwear, bag_front, or buckle. Use overall only for all-over patterns, stripes, color blocking, broad panel arrangement, or distinctive whole-item layout."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "Reliable visual characteristic to preserve or correct from the cited image. For complex logos, prints and textures, identify the region and visual source rather than guessing lettering or reconstructing artwork in prose. Include intrinsic colors or color blocking only when reliable; do not mistake reference lighting or white balance for product color."
+                },
+                "source_ref": {
+                  "type": "integer",
+                  "minimum": 2,
+                  "description": "Exactly one clearest authoritative image for this detail; split facts into separate details when they require different sources."
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

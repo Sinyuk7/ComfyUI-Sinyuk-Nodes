@@ -38,6 +38,8 @@ Templates = Prompt 表达结构
 Image Model = 执行最终换装
 ```
 
+以下图片角色与优先级适用于 Replacement 预设。
+
 Image 1 是固定主体锚点，同时可以作为兼容的 styling prior：它提供人物身份、姿势、构图、视角、四肢位置、接触点和自然遮挡，也可以在不与目标服装冲突时提示叠穿关系、塞入状态、袖口处理、腰部关系和配件摆放。Image 1 的原服装不是目标服装身份参考。
 Images 2..N 定义目标 outfit 的身份、类别、版型、结构、颜色、图案、材质和具体细节，包括服装、鞋、包、腰带等。
 
@@ -55,3 +57,16 @@ Image 1 主体几何与构图
 Reference 应遵循“最小充分引用”：整体版型使用必要的 `main_refs`，具体局部细节在 `key_details[].source_ref` 中绑定一个最清晰、最权威的来源；compiler 会从这些 source_ref 确定性派生补充细节引用，不再维护独立的 `detail_refs`。避免无意义的多图交叉引用。
 
 V2 协议删除 `id`、`must_preserve` 和 `priority`。`shape` 表达固有版型结构，`key_details` 按重要性顺序表达超出 shape 的显著细节，`subject.styling` 仅承载 Image 1 的兼容穿搭先验。
+
+
+资源按 presets/replacement 与 presets/enhancement 分组。Context 保留三个输出；
+schema 同时连接通用 LLM 和 Prompt Builder。schema.name 分别为
+garment_replacement / garment_enhancement；两者共用 V2 结构、校验与渲染逻辑，
+按身份选择模板，不修改通用 LLM 节点。
+
+Enhancement 保留原图人物、姿势、构图、背景、灯光、色调影调及已有穿搭整体轮廓；
+参考图用于可靠细节纠正、材质精修与明确缺失单品的合理补入。
+允许必要的局部形态、遮挡、接触阴影变化，不改变手势或虚构背带以容纳新增物品。
+不可见不等于缺失；不自动添加参考模特的陪衬配饰。
+subject.styling 表达需保留的已有穿搭关系，shape 仅提供结构上下文。
+不要求逐项错误诊断；复杂 Logo、印花优先引用图片，不猜测文字。

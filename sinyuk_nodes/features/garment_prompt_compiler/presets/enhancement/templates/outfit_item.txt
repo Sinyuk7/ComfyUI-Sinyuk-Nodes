@@ -1,0 +1,16 @@
+${item_title}
+
+References:
+${references}
+
+Reference structure:
+${shape}
+
+Material properties (render under Image 1 lighting):
+${fabric_behavior}
+
+Source-grounded details:
+${key_details}
+
+Wearing and integration within the unchanged pose:
+${presentation}

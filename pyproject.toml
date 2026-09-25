@@ -35,7 +35,10 @@ requires-comfyui = ">=0.0.2"
 include = ["sinyuk_nodes*"]
 
 [tool.setuptools.package-data]
-"sinyuk_nodes.features.garment_prompt_compiler" = ["*.json", "templates/*.txt"]
+"sinyuk_nodes.features.garment_prompt_compiler" = [
+    "presets/**/*.json",
+    "presets/**/*.txt",
+]
 "sinyuk_nodes.features.image_api" = ["*.json", "docs/*.md", "web/*.js", "web/*.mjs"]
 
 [tool.pyright]
