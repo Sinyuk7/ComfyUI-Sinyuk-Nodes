@@ -19,7 +19,46 @@ def _fixture_path(name: str = "GarmentAnalysis.json") -> Path:
 
 def _fixture() -> str:
     path = _fixture_path()
-    return path.read_text(encoding="utf-8")
+    if path.exists():
+        return path.read_text(encoding="utf-8")
+    return json.dumps(
+        {
+            "schema_version": "2.0",
+            "subject": {
+                "crop": "full_body",
+                "pose": "standing",
+                "view": "front",
+                "notes": "",
+                "styling": "Keep the existing layering.",
+            },
+            "garments": [
+                {
+                    "category": "dress",
+                    "main_refs": [2, 3],
+                    "shape": "Straight dress.",
+                    "fabric_behavior": "Soft drape.",
+                    "presentation": "Retain existing fit.",
+                    "key_details": [
+                        {"region": "collar", "description": "Rounded collar.", "source_ref": 2}
+                    ],
+                },
+                {
+                    "category": "shoes",
+                    "main_refs": [3],
+                    "shape": "Flat shoes.",
+                    "fabric_behavior": "Matte leather.",
+                    "presentation": "Follow the feet.",
+                    "key_details": [
+                        {
+                            "region": "footwear",
+                            "description": "Simple rounded almond-toe flat",
+                            "source_ref": 3,
+                        }
+                    ],
+                },
+            ],
+        }
+    )
 
 
 @pytest.mark.parametrize(
@@ -27,14 +66,19 @@ def _fixture() -> str:
     [path.name for path in sorted(_fixture_path().parent.glob("GarmentAnalysis*.json"))],
 )
 def test_compile_prompt_accepts_all_garment_analysis_fixtures(fixture_name: str) -> None:
-    prompt = compile_prompt(_fixture_path(fixture_name).read_text(encoding="utf-8"))
+    prompt = compile_prompt(
+        _fixture_path(fixture_name).read_text(encoding="utf-8"),
+        schema=load_garment_analysis_schema(),
+    )
 
     assert prompt.startswith("Use Image 1 as the fixed base subject.")
     assert "Subject context:" in prompt
 
 
 def test_compile_prompt_renders_all_items_and_compact_references() -> None:
-    prompt = compile_prompt(_fixture(), "Keep the background unchanged.")
+    prompt = compile_prompt(
+        _fixture(), "Keep the background unchanged.", schema=load_garment_analysis_schema()
+    )
 
     assert "Target item 1 — dress" in prompt
     assert "Target item 2" in prompt
@@ -60,7 +104,7 @@ def test_compile_prompt_preserves_detail_order_and_derives_detail_refs() -> None
             "source_ref": 4,
         },
     ]
-    prompt = compile_prompt(json.dumps(data))
+    prompt = compile_prompt(json.dumps(data), schema=load_garment_analysis_schema())
 
     assert "Extra critical detail." in prompt
     assert "Extra important detail." in prompt
@@ -74,7 +118,7 @@ def test_compile_prompt_rejects_missing_required_fields() -> None:
     del data["garments"][0]["presentation"]
 
     with pytest.raises(ValueError, match=r"garments\[0\]\.presentation"):
-        compile_prompt(json.dumps(data))
+        compile_prompt(json.dumps(data), schema=load_garment_analysis_schema())
 
 
 def test_compile_prompt_rejects_old_detail_refs_field() -> None:
@@ -82,25 +126,25 @@ def test_compile_prompt_rejects_old_detail_refs_field() -> None:
     data["garments"][0]["detail_refs"] = [2]
 
     with pytest.raises(ValueError):
-        compile_prompt(json.dumps(data))
+        compile_prompt(json.dumps(data), schema=load_garment_analysis_schema())
 
 
 def test_compile_prompt_requires_v2_subject_styling_and_source_ref() -> None:
     data = json.loads(_fixture())
     del data["subject"]["styling"]
     with pytest.raises(ValueError, match="subject.styling"):
-        compile_prompt(json.dumps(data))
+        compile_prompt(json.dumps(data), schema=load_garment_analysis_schema())
 
     data = json.loads(_fixture())
     del data["garments"][0]["key_details"][0]["source_ref"]
     with pytest.raises(ValueError, match="source_ref"):
-        compile_prompt(json.dumps(data))
+        compile_prompt(json.dumps(data), schema=load_garment_analysis_schema())
 
 
 def test_bundled_schema_is_named_and_strict() -> None:
     schema = load_garment_analysis_schema()
 
-    assert schema.name == "garment_analysis"
+    assert schema.name == "garment_replacement"
     assert schema.schema["additionalProperties"] is False
 
 
@@ -111,4 +155,57 @@ def test_garment_analysis_context_loads_all_protocol_parts() -> None:
     assert context.user_prompt.startswith("Analyze the provided images")
     assert "compatible styling anchor" in context.system_prompt
     assert "not a target garment identity reference" in context.user_prompt
-    assert context.schema.name == "garment_analysis"
+    assert context.schema.name == "garment_replacement"
+
+
+@pytest.mark.parametrize("preset", ["replacement", "enhancement"])
+def test_preset_context_drives_matching_prompt(preset: str) -> None:
+    context = load_garment_analysis_context(preset)
+    prompt = compile_prompt(_fixture(), "Keep the hands fixed.", schema=context.schema)
+    assert context.system_prompt
+    assert context.user_prompt
+    assert "Target item 1" in prompt
+    assert "Image 3: Simple rounded almond-toe flat" in prompt
+    assert prompt.endswith("Keep the hands fixed.")
+    if preset == "enhancement":
+        assert prompt.startswith("Enhance the outfit")
+        assert "Reference structure" in prompt
+        assert "Replace the current outfit completely" not in prompt
+    else:
+        assert prompt.startswith("Use Image 1 as the fixed base subject.")
+
+
+def test_builder_rejects_unknown_or_modified_schema() -> None:
+    from sinyuk_nodes.features.llm.schema import JSONSchemaDocument
+
+    with pytest.raises(ValueError, match="Unsupported garment prompt schema"):
+        compile_prompt(_fixture(), schema=JSONSchemaDocument("unknown", {}))
+    with pytest.raises(ValueError, match="does not match"):
+        compile_prompt(_fixture(), schema=JSONSchemaDocument("garment_enhancement", {}))
+    with pytest.raises(ValueError, match="Unsupported garment analysis preset"):
+        load_garment_analysis_context("../unknown")
+
+
+def test_enhancement_omits_empty_sections_and_deduplicates_references() -> None:
+    data = json.loads(_fixture())
+    data["garments"] = data["garments"][:1]
+    item = data["garments"][0]
+    item.update(
+        main_refs=[2, 2, 3],
+        shape=" ",
+        fabric_behavior="",
+        presentation="",
+        key_details=[],
+    )
+    prompt = compile_prompt(json.dumps(data), schema=load_garment_analysis_schema("enhancement"))
+    assert "Use Images 2 and 3 as the main references." in prompt
+    assert "Reference structure:" not in prompt
+    assert "Material properties (" not in prompt
+    assert "Source-grounded details:" not in prompt
+    assert "Wearing and integration" not in prompt
+    assert "No additional key details." not in prompt
+
+    item["presentation"] = "Wear naturally from the shoulder."
+    prompt = compile_prompt(json.dumps(data), schema=load_garment_analysis_schema("enhancement"))
+    assert "Wearing and integration" in prompt
+    assert "Wear naturally from the shoulder." in prompt

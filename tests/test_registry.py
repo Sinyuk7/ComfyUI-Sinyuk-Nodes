@@ -7,7 +7,10 @@ import importlib.util
 from pathlib import Path
 
 from sinyuk_nodes.extension import SinyukNodesExtension, comfy_entrypoint
-from sinyuk_nodes.nodes.garment_prompt_compiler import GarmentAnalysisContextNode
+from sinyuk_nodes.nodes.garment_prompt_compiler import (
+    GarmentAnalysisContextNode,
+    GarmentPromptCompiler,
+)
 from sinyuk_nodes.nodes.llm.chat import LLMAPINode
 from sinyuk_nodes.registry import ALL_NODES, get_node_list
 
@@ -52,7 +55,7 @@ def test_garment_analysis_context_node_returns_protocol_outputs() -> None:
     assert len(output.result) == 3
     assert output.result[0]
     assert output.result[1]
-    assert output.result[2].name == "garment_analysis"
+    assert output.result[2].name == "garment_replacement"
 
 
 def test_llm_api_schema_groups_prompts_before_structured_output_options() -> None:
@@ -67,3 +70,35 @@ def test_llm_api_schema_groups_prompts_before_structured_output_options() -> Non
         "images",
     ]
     assert inputs[2].display_name == "User Prompt"
+
+
+def test_enhancement_context_connects_to_builder() -> None:
+    import json
+
+    output = GarmentAnalysisContextNode.execute("Enhancement")
+    schema = output.result[2]
+    GarmentPromptCompiler.define_schema().validate()
+    analysis = json.dumps(
+        {
+            "schema_version": "2.0",
+            "subject": {
+                "crop": "waist_up",
+                "pose": "standing",
+                "view": "front",
+                "notes": "",
+                "styling": "",
+            },
+            "garments": [
+                {
+                    "category": "bag",
+                    "main_refs": [2],
+                    "shape": "Small bag",
+                    "fabric_behavior": "Leather",
+                    "presentation": "Shoulder worn",
+                    "key_details": [],
+                }
+            ],
+        }
+    )
+    result = GarmentPromptCompiler.execute(analysis_json=analysis, schema=schema)
+    assert result.result[0].startswith("Enhance the outfit")

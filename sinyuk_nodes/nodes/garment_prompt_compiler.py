@@ -12,6 +12,7 @@ from sinyuk_nodes.features.garment_prompt_compiler import (
     compile_prompt,
     load_garment_analysis_context,
 )
+from sinyuk_nodes.features.llm.schema import JSONSchemaDocument
 
 from .llm.schema import JSON_SCHEMA
 
@@ -28,6 +29,14 @@ class GarmentAnalysisContextNode(io.ComfyNode):
             description=(
                 "Provide the system prompt, user prompt, and JSON Schema for garment analysis."
             ),
+            inputs=[
+                io.Combo.Input(
+                    "preset",
+                    options=["Replacement", "Enhancement"],
+                    default="Replacement",
+                    display_name="Preset",
+                )
+            ],
             outputs=[
                 io.String.Output("system_prompt", display_name="System Prompt"),
                 io.String.Output("user_prompt", display_name="User Prompt"),
@@ -36,22 +45,23 @@ class GarmentAnalysisContextNode(io.ComfyNode):
         )
 
     @classmethod
-    def execute(cls) -> io.NodeOutput:
-        context = load_garment_analysis_context()
+    def execute(cls, preset: str = "Replacement") -> io.NodeOutput:
+        preset_id = preset.lower()
+        context = load_garment_analysis_context(preset_id)
         return io.NodeOutput(context.system_prompt, context.user_prompt, context.schema)
 
 
 class GarmentPromptCompiler(io.ComfyNode):
-    """Compile GarmentAnalysis JSON into a deterministic replacement prompt."""
+    """Compile GarmentAnalysis JSON into a deterministic image editing prompt."""
 
     @classmethod
     def define_schema(cls) -> io.Schema:
         return io.Schema(
             node_id="Sinyuk.GarmentPromptCompiler",
-            display_name="Garment Prompt Compiler",
+            display_name="Garment Prompt Builder",
             category="Sinyuk/Garment",
             description=(
-                "Compile a GarmentAnalysis JSON response into a garment replacement prompt."
+                "Build an image editing prompt from analysis JSON and its matching Schema."
             ),
             inputs=[
                 io.String.Input(
@@ -60,6 +70,11 @@ class GarmentPromptCompiler(io.ComfyNode):
                     multiline=True,
                     optional=True,
                     tooltip="JSON response produced by the upstream garment analysis LLM.",
+                ),
+                JSON_SCHEMA.Input(
+                    "schema",
+                    display_name="Analysis Schema",
+                    tooltip="The schema emitted by the matching Garment Analysis Context.",
                 ),
                 io.String.Input(
                     "extra_prompt",
@@ -73,8 +88,15 @@ class GarmentPromptCompiler(io.ComfyNode):
         )
 
     @classmethod
-    def execute(cls, analysis_json: str = "", extra_prompt: str = "") -> io.NodeOutput:
-        return io.NodeOutput(compile_prompt(analysis_json, extra_prompt))
+    def execute(
+        cls,
+        analysis_json: str = "",
+        schema: JSONSchemaDocument | None = None,
+        extra_prompt: str = "",
+    ) -> io.NodeOutput:
+        if schema is None:
+            raise ValueError("Garment Prompt Builder requires the matching Analysis Schema.")
+        return io.NodeOutput(compile_prompt(analysis_json, extra_prompt, schema=schema))
 
 
 __all__ = ["GarmentAnalysisContextNode", "GarmentPromptCompiler"]

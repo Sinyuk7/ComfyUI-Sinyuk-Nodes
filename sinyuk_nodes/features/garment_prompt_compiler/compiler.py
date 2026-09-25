@@ -56,27 +56,30 @@ def _is_object_dict(value: object) -> TypeGuard[dict[object, object]]:
     return isinstance(value, dict)
 
 
-def _asset(name: str) -> str:
+def _asset(name: str, preset: str) -> str:
     return (
         files("sinyuk_nodes.features.garment_prompt_compiler")
-        .joinpath(name)
+        .joinpath("presets", preset, name)
         .read_text(encoding="utf-8")
     )
 
 
-def load_garment_analysis_schema() -> JSONSchemaDocument:
+def load_garment_analysis_schema(preset: str = "replacement") -> JSONSchemaDocument:
     """Load the bundled schema used by the upstream GarmentAnalysis LLM."""
 
-    return parse_json_schema(_asset("schema.json"), "garment_analysis")
+    if preset not in {"replacement", "enhancement"}:
+        raise ValueError(f"Unsupported garment analysis preset: {preset}.")
+    return parse_json_schema(_asset("schema.json", preset), f"garment_{preset}")
 
 
-def load_garment_analysis_context() -> GarmentAnalysisContext:
+def load_garment_analysis_context(preset: str = "replacement") -> GarmentAnalysisContext:
     """Load the complete static Garment Analysis protocol."""
 
+    schema = load_garment_analysis_schema(preset)
     return GarmentAnalysisContext(
-        system_prompt=_asset("templates/system_prompt.txt").strip(),
-        user_prompt=_asset("templates/user_prompt.txt").strip(),
-        schema=load_garment_analysis_schema(),
+        system_prompt=_asset("templates/system_prompt.txt", preset).strip(),
+        user_prompt=_asset("templates/user_prompt.txt", preset).strip(),
+        schema=schema,
     )
 
 
@@ -124,7 +127,7 @@ def _require_int_list(value: object, path: str) -> list[int]:
     refs = [item for item in values if isinstance(item, int) and not isinstance(item, bool)]
     if any(ref < 2 for ref in refs):
         raise ValueError(f"Invalid GarmentAnalysis JSON: {path} references must be at least 2.")
-    return refs
+    return list(dict.fromkeys(refs))
 
 
 def _parse_detail(value: object, index: int, garment_index: int) -> _KeyDetail:
@@ -242,7 +245,7 @@ def _render_item_title(index: int, garment: _Garment) -> str:
     return f"Target item {index} — {category}" if category != "other" else f"Target item {index}"
 
 
-def _render_item(index: int, garment: _Garment) -> str:
+def _render_item(index: int, garment: _Garment, preset: str) -> str:
     detail_lines = [
         f"- {detail['region']} — "
         f"Image {detail['source_ref']}: {detail['description'].strip().rstrip('.。')}."
@@ -259,29 +262,48 @@ def _render_item(index: int, garment: _Garment) -> str:
     if detail_refs:
         detail_label = "reference" if len(detail_refs) == 1 else "references"
         references += f" Use {_format_refs(detail_refs)} as additional detail {detail_label}."
-    return (
-        Template(_asset("templates/outfit_item.txt"))
-        .safe_substitute(
-            item_title=_render_item_title(index, garment),
-            references=references,
-            shape=garment["shape"],
-            fabric_behavior=garment["fabric_behavior"],
-            key_details=key_details,
-            presentation=garment["presentation"],
+    values = {
+        "item_title": _render_item_title(index, garment),
+        "references": references,
+        "shape": garment["shape"],
+        "fabric_behavior": garment["fabric_behavior"],
+        "key_details": key_details,
+        "presentation": garment["presentation"],
+    }
+    template = _asset("templates/outfit_item.txt", preset)
+    if preset == "enhancement":
+        values["key_details"] = "\n".join(detail_lines)
+        # Each optional section belongs to one field in the bundled item template.
+        template = "\n\n".join(
+            block
+            for block in template.split("\n\n")
+            if not any(
+                "${" + field + "}" in block and not values[field].strip()
+                for field in ("shape", "fabric_behavior", "key_details", "presentation")
+            )
         )
-        .strip()
-    )
+    return Template(template).substitute(values).strip()
 
 
-def compile_prompt(analysis_json: str, extra_prompt: str = "") -> str:
+def compile_prompt(
+    analysis_json: str, extra_prompt: str = "", *, schema: JSONSchemaDocument
+) -> str:
     """Compile one validated GarmentAnalysis JSON document into a prompt."""
 
+    preset = {
+        "garment_replacement": "replacement",
+        "garment_enhancement": "enhancement",
+    }.get(schema.name)
+    if preset is None:
+        raise ValueError(f"Unsupported garment prompt schema: {schema.name}.")
+    if schema.schema != load_garment_analysis_schema(preset).schema:
+        raise ValueError("Analysis Schema does not match the bundled preset.")
     analysis = _parse_analysis(analysis_json)
     item_blocks: list[str] = []
     for index, garment in enumerate(analysis["garments"], start=1):
-        item_blocks.append(_render_item(index, garment))
+        item_blocks.append(_render_item(index, garment, preset))
     return (
-        Template(_asset("templates/garment_replacement.txt"))
+        Template(_asset(f"templates/garment_{preset}.txt", preset))
         .safe_substitute(
             outfit_items="\n\n".join(item_blocks),
             subject_context=_render_subject(analysis["subject"]),
