@@ -8,6 +8,9 @@ from pathlib import Path
 
 from sinyuk_nodes.extension import SinyukNodesExtension, comfy_entrypoint
 from sinyuk_nodes.nodes.garment_prompt_compiler import GarmentAnalysisContextNode
+from sinyuk_nodes.nodes.image_api.batch import BatchImageGenerate, ImageAPILoadImagesFromFolder
+from sinyuk_nodes.nodes.image_api.config import ImageAPIConfig
+from sinyuk_nodes.nodes.image_api.generate import ImageGenerate
 from sinyuk_nodes.nodes.llm.chat import LLMAPINode
 from sinyuk_nodes.registry import ALL_NODES, get_node_list
 
@@ -20,6 +23,10 @@ def test_registry_is_explicit() -> None:
         "GarmentAnalysisContextNode",
         "GarmentPromptCompiler",
         "LLMAPINode",
+        "ImageAPIConfig",
+        "ImageGenerate",
+        "ImageAPILoadImagesFromFolder",
+        "BatchImageGenerate",
     ]
     assert get_node_list() == ALL_NODES
     assert get_node_list() is not ALL_NODES
@@ -67,3 +74,17 @@ def test_llm_api_schema_groups_prompts_before_structured_output_options() -> Non
         "images",
     ]
     assert inputs[2].display_name == "User Prompt"
+
+
+def test_image_api_nodes_use_the_module_namespace() -> None:
+    assert [
+        ImageAPIConfig.define_schema().node_id,
+        ImageGenerate.define_schema().node_id,
+        ImageAPILoadImagesFromFolder.define_schema().node_id,
+        BatchImageGenerate.define_schema().node_id,
+    ] == [
+        "Sinyuk.ImageAPI.Config",
+        "Sinyuk.ImageAPI.Generate",
+        "Sinyuk.ImageAPI.LoadFolder",
+        "Sinyuk.ImageAPI.BatchGenerate",
+    ]

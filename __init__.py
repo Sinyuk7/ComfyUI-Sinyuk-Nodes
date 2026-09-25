@@ -16,5 +16,6 @@ if _PACKAGE_ROOT not in sys.path:
 from sinyuk_nodes.extension import comfy_entrypoint
 
 __version__ = "0.1.0"
+WEB_DIRECTORY = "./sinyuk_nodes/features/image_api/web"
 
-__all__ = ["__version__", "comfy_entrypoint"]
+__all__ = ["__version__", "WEB_DIRECTORY", "comfy_entrypoint"]

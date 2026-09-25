@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 from .compat.comfy import ComfyExtension, io
+from .features.image_api.config import get_config
+from .features.image_api.diagnostics import initialize_diagnostics
 from .features.llm.client import cached_model_options
+from .nodes.image_api.host import install_host
 from .registry import get_node_list
 
 
@@ -12,6 +15,10 @@ class SinyukNodesExtension(ComfyExtension):
 
     async def on_load(self) -> None:
         """Expose the cached model catalog to the native V3 remote combo."""
+
+        get_config()
+        initialize_diagnostics()
+        install_host()
 
         from aiohttp import web
         from server import PromptServer

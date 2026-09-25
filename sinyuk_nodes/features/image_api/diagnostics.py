@@ -1,0 +1,65 @@
+"""Small bounded diagnostic log for generation lifecycle events."""
+
+from __future__ import annotations
+
+import json
+import logging
+from logging.handlers import RotatingFileHandler
+from pathlib import Path
+from uuid import uuid4
+
+LOG_NAME = "image_api.diagnostics"
+MAX_BYTES = 2 * 1024 * 1024
+BACKUP_COUNT = 4
+_HANDLER_MARKER = "_image_api_diagnostic_handler"
+
+
+def _default_directory() -> Path:
+    import folder_paths
+
+    system_directory = getattr(folder_paths, "get_system_user_directory", None)
+    if system_directory:
+        return Path(system_directory("image_api")) / "logs"
+    return Path(folder_paths.get_user_directory()) / "__image_api" / "logs"
+
+
+def initialize_diagnostics(directory: Path | str | None = None) -> Path | None:
+    """Install one private rotating handler without changing ComfyUI's root logger."""
+    logger = logging.getLogger(LOG_NAME)
+    for handler in logger.handlers:
+        if getattr(handler, _HANDLER_MARKER, False):
+            return Path(handler.baseFilename)
+
+    path = Path(directory) if directory is not None else _default_directory()
+    try:
+        path.mkdir(parents=True, exist_ok=True, mode=0o700)
+        destination = path / "image_api.log"
+        handler = RotatingFileHandler(
+            destination,
+            maxBytes=MAX_BYTES,
+            backupCount=BACKUP_COUNT,
+            encoding="utf-8",
+        )
+        setattr(handler, _HANDLER_MARKER, True)
+        handler.setLevel(logging.INFO)
+        handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
+        logger.addHandler(handler)
+        logger.setLevel(logging.INFO)
+        logger.propagate = True
+        logger.info("Image API diagnostic log: %s", destination)
+        return destination
+    except OSError as exc:
+        logging.getLogger(__name__).warning("Image API diagnostic log unavailable: %s", exc)
+        return None
+
+
+def new_run_id() -> str:
+    return uuid4().hex[:12]
+
+
+def log_event(name: str, *, level: int = logging.INFO, **fields: object) -> None:
+    parts = [name]
+    for key, value in fields.items():
+        if value is not None:
+            parts.append(f"{key}={json.dumps(value, ensure_ascii=True, separators=(',', ':'))}")
+    logging.getLogger(LOG_NAME).log(level, " ".join(parts))
