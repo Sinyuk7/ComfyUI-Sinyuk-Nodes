@@ -19,6 +19,7 @@ from .schema import JSONSchemaDocument
 
 _RESPONSE_CACHE: OrderedDict[str, str] = OrderedDict()
 _CACHE_LIMIT = 128
+_REASONING_EFFORTS = {"none", "minimal", "low", "medium", "high", "xhigh", "max"}
 
 
 @dataclass(frozen=True)
@@ -39,9 +40,10 @@ def _execution_summary(
     cache: str,
     elapsed_ms: int,
     response: str,
+    reasoning_effort: str = "none",
 ) -> str:
     api = "resp" if config.api_mode == "responses" else "chat"
-    fmt = "js" if response_format == "json_schema" else "text"
+    fmt = {"json_schema": "JSON Schema", "json_object": "JSON Object"}.get(response_format, "Text")
     schema_name = json_schema.name if json_schema is not None else "-"
     token_limit = str(max_tokens) if max_tokens is not None else "-"
     return (
@@ -52,6 +54,7 @@ def _execution_summary(
         f"- **JSON Schema:** `{schema_name}`\n"
         f"- **Images:** `{image_count}` (`{image_detail}` detail)\n"
         f"- **Max tokens:** `{token_limit}`\n"
+        f"- **Reasoning effort:** `{reasoning_effort}`\n"
         f"- **Cache:** `{cache}`\n"
         f"- **Elapsed:** `{elapsed_ms} ms`\n"
         f"- **Output length:** `{len(response)}` characters"
@@ -132,7 +135,10 @@ def build_payload(
     response_format: str = "text",
     json_schema: JSONSchemaDocument | None = None,
     image_detail: str = "high",
+    reasoning_effort: str = "none",
 ) -> dict[str, object]:
+    if reasoning_effort not in _REASONING_EFFORTS:
+        raise ValueError("Unsupported reasoning effort.")
     user_content: str | list[dict[str, object]] = prompt
     if images:
         user_content = [{"type": "text", "text": prompt}]
@@ -160,6 +166,8 @@ def build_payload(
         payload["top_p"] = top_p
     if max_tokens is not None:
         payload["max_tokens"] = max_tokens
+    if reasoning_effort != "none":
+        payload["reasoning_effort"] = reasoning_effort
     if response_format == "json_schema":
         if json_schema is None:
             raise ValueError("Connect a JSON Schema node when using JSON Schema format.")
@@ -171,6 +179,8 @@ def build_payload(
                 "schema": json_schema.schema,
             },
         }
+    elif response_format == "json_object":
+        payload["response_format"] = {"type": "json_object"}
     elif response_format != "text":
         raise ValueError("Unsupported response format.")
     return payload
@@ -187,7 +197,10 @@ def build_responses_payload(
     response_format: str = "text",
     json_schema: JSONSchemaDocument | None = None,
     image_detail: str = "high",
+    reasoning_effort: str = "none",
 ) -> dict[str, object]:
+    if reasoning_effort not in _REASONING_EFFORTS:
+        raise ValueError("Unsupported reasoning effort.")
     content: str | list[dict[str, object]] = prompt
     if images:
         content = [{"type": "input_text", "text": prompt}]
@@ -213,6 +226,8 @@ def build_responses_payload(
         payload["top_p"] = top_p
     if max_tokens is not None:
         payload["max_output_tokens"] = max_tokens
+    if reasoning_effort != "none":
+        payload["reasoning"] = {"effort": reasoning_effort}
     if response_format == "json_schema":
         if json_schema is None:
             raise ValueError("Connect a JSON Schema node when using JSON Schema format.")
@@ -224,6 +239,8 @@ def build_responses_payload(
                 "schema": json_schema.schema,
             }
         }
+    elif response_format == "json_object":
+        payload["text"] = {"format": {"type": "json_object"}}
     elif response_format != "text":
         raise ValueError("Unsupported response format.")
     return payload
@@ -241,6 +258,7 @@ async def execute_chat(
     response_format: str = "text",
     json_schema: JSONSchemaDocument | None = None,
     image_detail: str = "high",
+    reasoning_effort: str = "none",
 ) -> ChatResult:
     started = perf_counter()
     check_interrupt()
@@ -257,6 +275,7 @@ async def execute_chat(
         response_format,
         json_schema,
         image_detail,
+        reasoning_effort,
     )
     fingerprint_data: dict[str, object] = {
         "base_url": config.base_url,
@@ -268,6 +287,7 @@ async def execute_chat(
         "temperature": temperature,
         "top_p": top_p,
         "max_tokens": max_tokens,
+        "reasoning_effort": reasoning_effort,
         "response_format": response_format,
         "json_schema": None
         if json_schema is None
@@ -298,6 +318,7 @@ async def execute_chat(
                 "hit",
                 round((perf_counter() - started) * 1000),
                 response,
+                reasoning_effort,
             ),
         )
     if config.api_mode == "responses":
@@ -321,6 +342,7 @@ async def execute_chat(
             "miss",
             round((perf_counter() - started) * 1000),
             result,
+            reasoning_effort,
         ),
     )
 

@@ -18,6 +18,7 @@ from .schema import JSON_SCHEMA
 
 _RESPONSE_FORMAT_VALUES = {
     "Text": "text",
+    "JSON Object": "json_object",
     "JSON Schema": "json_schema",
 }
 
@@ -57,9 +58,7 @@ class LLMAPINode(io.ComfyNode):
                     options=list(_RESPONSE_FORMAT_VALUES),
                     default="Text",
                     display_name="Response Format",
-                    tooltip=(
-                        "Text or JSON Schema Structured Outputs format requested from the model."
-                    ),
+                    tooltip="Request plain text, a JSON object, or output matching a JSON Schema.",
                 ),
                 JSON_SCHEMA.Input(
                     "json_schema",
@@ -81,6 +80,14 @@ class LLMAPINode(io.ComfyNode):
                     control_after_generate=True,
                     display_name="Seed",
                     tooltip="Seed used for ComfyUI execution and cache identity.",
+                    advanced=True,
+                ),
+                io.Combo.Input(
+                    "reasoning_effort",
+                    options=["none", "minimal", "low", "medium", "high", "xhigh", "max"],
+                    default="none",
+                    display_name="Reasoning Effort",
+                    tooltip="Controls reasoning effort when supported by the selected model.",
                     advanced=True,
                 ),
                 io.Combo.Input(
@@ -153,6 +160,7 @@ class LLMAPINode(io.ComfyNode):
         temperature: float | None = None,
         top_p: float | None = None,
         max_tokens: int | None = None,
+        reasoning_effort: str = "none",
     ) -> io.NodeOutput:
         response_format = _RESPONSE_FORMAT_VALUES.get(response_format, response_format)
         result = await execute_chat(
@@ -167,6 +175,7 @@ class LLMAPINode(io.ComfyNode):
             response_format,
             json_schema,
             image_detail,
+            reasoning_effort,
         )
         return io.NodeOutput(result.response, result.execution_summary)
 

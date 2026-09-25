@@ -149,6 +149,35 @@ def test_responses_json_schema_is_sent_as_text_format() -> None:
     }
 
 
+def test_json_object_format_is_supported_by_both_apis() -> None:
+    config = build_config(
+        "secret", "https://example.test/v1", "", "listed-model", ("listed-model",)
+    )
+
+    assert build_payload(config, "", "Reply.", (), response_format="json_object")[
+        "response_format"
+    ] == {"type": "json_object"}
+    assert build_responses_payload(config, "", "Reply.", (), response_format="json_object")[
+        "text"
+    ] == {"format": {"type": "json_object"}}
+
+
+def test_reasoning_effort_none_is_omitted_and_other_values_are_api_specific() -> None:
+    config = build_config(
+        "secret", "https://example.test/v1", "", "listed-model", ("listed-model",)
+    )
+
+    chat_default = build_payload(config, "", "Reply.", ())
+    responses_default = build_responses_payload(config, "", "Reply.", ())
+    assert "reasoning_effort" not in chat_default
+    assert "reasoning" not in responses_default
+
+    chat = build_payload(config, "", "Reply.", (), reasoning_effort="high")
+    responses = build_responses_payload(config, "", "Reply.", (), reasoning_effort="high")
+    assert chat["reasoning_effort"] == "high"
+    assert responses["reasoning"] == {"effort": "high"}
+
+
 def test_responses_text_extracts_output_text() -> None:
     assert (
         _responses_text(
@@ -217,10 +246,11 @@ def test_execution_summary_is_markdown() -> None:
         "### Execution Summary\n\n"
         "- **API:** `resp`\n"
         "- **Model:** `listed-model`\n"
-        "- **Response format:** `js`\n"
+        "- **Response format:** `JSON Schema`\n"
         "- **JSON Schema:** `status_result`\n"
         "- **Images:** `4` (`high` detail)\n"
         "- **Max tokens:** `2048`\n"
+        "- **Reasoning effort:** `none`\n"
         "- **Cache:** `miss`\n"
         "- **Elapsed:** `123 ms`\n"
         "- **Output length:** `2` characters"
