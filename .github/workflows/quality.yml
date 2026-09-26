@@ -26,9 +26,9 @@ jobs:
       - name: Compile Python
         run: python -m compileall -q sinyuk_nodes tests
       - name: Ruff lint
-        run: ruff check .
+        run: ruff check --extend-exclude ComfyUI .
       - name: Ruff format
-        run: ruff format --check .
+        run: ruff format --check --extend-exclude ComfyUI .
       - name: Pyright
         run: pyright
       - name: Tests
