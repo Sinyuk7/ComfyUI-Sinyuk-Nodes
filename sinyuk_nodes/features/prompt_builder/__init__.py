@@ -1,10 +1,11 @@
-"""Compile GarmentAnalysis JSON into deterministic replacement prompts."""
+"""Preset-backed prompt context loading and prompt building."""
 
 from __future__ import annotations
 
 from .compiler import (
     LoadedPromptContext,
     PromptContext,
+    available_presets,
     build_prompt,
     compile_prompt,
     load_preset_schema,
@@ -14,6 +15,7 @@ from .compiler import (
 __all__ = [
     "LoadedPromptContext",
     "PromptContext",
+    "available_presets",
     "build_prompt",
     "compile_prompt",
     "load_preset_schema",

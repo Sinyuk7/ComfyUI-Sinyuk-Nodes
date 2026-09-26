@@ -10,6 +10,7 @@ from __future__ import annotations
 from sinyuk_nodes.compat.comfy import io
 from sinyuk_nodes.features.prompt_builder import (
     PromptContext,
+    available_presets,
     build_prompt,
     load_prompt_context,
 )
@@ -35,7 +36,7 @@ class PromptContextNode(io.ComfyNode):
             inputs=[
                 io.Combo.Input(
                     "preset",
-                    options=["garment.replacement", "garment.enhancement"],
+                    options=available_presets(),
                     default="garment.replacement",
                     display_name="Preset",
                 ),

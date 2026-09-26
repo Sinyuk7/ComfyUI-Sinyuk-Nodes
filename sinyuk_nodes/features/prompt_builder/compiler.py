@@ -69,12 +69,6 @@ class PromptContext:
     template: str | None
 
 
-_PRESET_PATHS = {
-    "garment.replacement": "garment/replacement",
-    "garment.enhancement": "garment/enhancement",
-}
-
-
 def _is_object_list(value: object) -> TypeGuard[list[object]]:
     return isinstance(value, list)
 
@@ -98,6 +92,42 @@ def _optional_asset(name: str, preset: str) -> str | None:
         return None
 
 
+def _discover_preset_paths() -> dict[str, str]:
+    """Discover preset IDs and resource paths from bundled manifests."""
+
+    root = files("sinyuk_nodes.features.prompt_builder").joinpath("presets")
+    discovered: dict[str, str] = {}
+    for category in root.iterdir():
+        if not category.is_dir():
+            continue
+        for preset in category.iterdir():
+            if not preset.is_dir():
+                continue
+            manifest = preset.joinpath("manifest.json")
+            if not manifest.is_file():
+                continue
+            try:
+                value: object = json.loads(manifest.read_text(encoding="utf-8"))
+            except json.JSONDecodeError as exc:
+                message = f"Invalid manifest.json in {category.name}/{preset.name}."
+                raise ValueError(message) from exc
+            if not isinstance(value, dict) or not isinstance(value.get("id"), str):
+                raise ValueError(
+                    f"Invalid manifest.json in {category.name}/{preset.name}: id is required."
+                )
+            preset_id = value["id"]
+            if preset_id in discovered:
+                raise ValueError(f"Duplicate prompt preset id: {preset_id}.")
+            discovered[preset_id] = f"{category.name}/{preset.name}"
+    return discovered
+
+
+def available_presets() -> list[str]:
+    """Return bundled prompt preset IDs in stable display order."""
+
+    return sorted(_discover_preset_paths())
+
+
 def _normalize_preset_id(preset: str) -> str:
     normalized = preset.strip().lower()
     aliases = {
@@ -109,7 +139,7 @@ def _normalize_preset_id(preset: str) -> str:
 
 def _preset_path(preset_id: str) -> str:
     try:
-        return _PRESET_PATHS[preset_id]
+        return _discover_preset_paths()[preset_id]
     except KeyError as exc:
         raise ValueError(f"Unsupported prompt preset: {preset_id}.") from exc
 
@@ -472,6 +502,7 @@ __all__ = [
     "LoadedPromptContext",
     "PromptContext",
     "build_prompt",
+    "available_presets",
     "compile_prompt",
     "load_preset_schema",
     "load_prompt_context",

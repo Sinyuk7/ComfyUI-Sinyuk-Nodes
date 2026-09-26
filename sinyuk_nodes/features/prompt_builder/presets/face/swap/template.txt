@@ -1,0 +1,2 @@
+Perform a face swap using the following structured instruction:
+${json}

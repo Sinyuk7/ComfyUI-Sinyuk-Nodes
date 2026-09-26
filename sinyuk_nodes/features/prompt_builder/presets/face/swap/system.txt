@@ -1,0 +1,1 @@
+Analyze the provided images for a face swap. Return a structured description of the requested face replacement.

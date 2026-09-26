@@ -8,11 +8,16 @@ from pathlib import Path
 import pytest
 from sinyuk_nodes.features.prompt_builder import (
     PromptContext,
+    available_presets,
     build_prompt,
     compile_prompt,
     load_preset_schema,
     load_prompt_context,
 )
+
+
+def test_prompt_presets_are_discovered_from_manifests() -> None:
+    assert available_presets() == ["face.swap", "garment.enhancement", "garment.replacement"]
 
 
 def _fixture_path(name: str = "GarmentAnalysis.json") -> Path:
@@ -248,3 +253,24 @@ def test_enhancement_allows_no_reliably_matching_reference_items() -> None:
 
     with pytest.raises(ValueError, match="garments cannot be empty"):
         compile_prompt(json.dumps(data), schema=load_preset_schema("replacement"))
+
+
+def test_template_preset_uses_the_generic_context_builder_chain() -> None:
+    context = load_prompt_context("face.swap")
+    assert context.compiler_id == "template"
+    assert context.template is not None
+
+    prompt_context = PromptContext(
+        preset_id=context.preset_id,
+        version=context.version,
+        schema=context.schema,
+        example=context.example,
+        compiler_id=context.compiler_id,
+        template=context.template,
+    )
+    prompt = build_prompt(
+        json.dumps({"instruction": "Preserve identity and match the target lighting."}),
+        context=prompt_context,
+    )
+
+    assert "Preserve identity and match the target lighting." in prompt
