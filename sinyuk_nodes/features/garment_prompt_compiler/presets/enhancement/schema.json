@@ -75,8 +75,8 @@
     },
     "garments": {
       "type": "array",
-      "minItems": 1,
-      "description": "Clearly intended reference items for refinement or supplementation. Exclude incidental styling props. An occluded or cropped item is not necessarily missing. One entry per intended item; merge references belonging to the same item.",
+      "minItems": 0,
+      "description": "Reference items that reliably correspond to items already present in Image 1. Omit reference items without a reliable counterpart. One entry per item; merge references belonging to the same item.",
       "items": {
         "type": "object",
         "additionalProperties": false,
@@ -104,7 +104,7 @@
           },
           "shape": {
             "type": "string",
-            "description": "Concise intrinsic structure for recognizing the reference item. For existing items this is context, not an instruction to reshape Image 1's overall silhouette or volume. For a genuinely missing intended item, this structure may guide construction."
+            "description": "Concise intrinsic structure for recognizing the reference item. Use as identity and construction context, not as an instruction to reshape Image 1's existing silhouette or volume."
           },
           "fabric_behavior": {
             "type": "string",
@@ -112,7 +112,7 @@
           },
           "presentation": {
             "type": "string",
-            "description": "Only useful item-specific wearing or integration information not already in subject.styling; empty string when unnecessary. For a clearly missing intended item, describe a plausible wearing or carrying relationship within the fixed pose and crop. Do not prescribe addition if presence is uncertain, invent supports, change gestures, or specify coordinates, angles or strap paths. Leave exact placement to the image model."
+            "description": "Only useful item-specific wearing details not already covered by subject.styling. Empty string when unnecessary. Do not prescribe restyling or placement changes."
           },
           "key_details": {
             "type": "array",

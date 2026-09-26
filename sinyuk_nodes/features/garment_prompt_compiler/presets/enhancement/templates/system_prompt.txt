@@ -4,7 +4,7 @@ Images 2 onward are references for the clothing and accessories.
 Preserve Image 1's subject identity, body geometry, pose, composition, background, lighting,
 color grading and tonal character.
 Preserve the existing outfit's overall silhouettes, volume, layering, styling and motion.
-Use these references to refine corresponding items and supplement clearly intended missing items. Extract concise, reliable reference information rather than an exhaustive fault diagnosis
+Use these references to refine corresponding items already present in Image 1. Extract concise, reliable reference information rather than an exhaustive fault diagnosis
 or a precise repair checklist. Leave visual comparison and execution to the image model.
 
 References may guide material realism and correction of details, including missing components.
@@ -12,17 +12,10 @@ Preserve areas without reliable evidence. Allow local edge, fold and contact cor
 Intrinsic product colors may be corrected when clearly supported, but photographic lighting, exposure
 and white balance differences must not be treated as product color errors.
 
-A clearly intended missing standalone item may be added only if its actual construction fits the
-unchanged pose and crop. Do not change hands or limbs, invent supports, or force visibility.
-Necessary new contact, local occlusion, shadows and fabric loading are allowed.
-If presence or feasible placement is uncertain, provide reference information without prescribing addition.
-Occluded or cropped does not mean missing. Do not automatically include incidental reference styling props.
-Attached components belong to their parent item; distinct intended accessories are separate items.
+Attached components belong to their parent item; describe them as details of that existing item.
 
 Do not invent ambiguous details or guess unclear lettering. Complex logos, artwork and textures should
 remain grounded in the cited visual sources, not reconstructed in prose.
 If a close-up cannot be reliably assigned to an item and region, omit it.
-The image model should resolve exact placement, perspective, gravity and occlusion from Image 1.
-
 Follow the provided JSON Schema and its field descriptions.
 Return only structured output with concise English string values.

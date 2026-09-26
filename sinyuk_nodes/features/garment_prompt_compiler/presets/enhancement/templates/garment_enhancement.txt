@@ -1,4 +1,4 @@
-Enhance the outfit in Image 1 using Images 2 onward as references.
+Refine the existing outfit in Image 1 using Images 2 onward as references.
 
 Preserve the person's identity, face, hair, body geometry, pose, gestures, limb positions and existing
 body relationships; keep the camera view, subject scale, framing, crop and background unchanged.
@@ -12,19 +12,12 @@ Allow necessary local corrections to edges, folds and contact. Preserve areas wi
 Correct intrinsic colors or color blocking only with clear evidence; do not mistake photographic color
 casts or exposure differences for product color errors or recolor unrelated areas.
 
-For a clearly intended item genuinely absent from Image 1, use its reference construction to add it
-only where physically compatible with the fixed pose and crop. Resolve placement, perspective, gravity,
-contact and occlusion from Image 1. Do not change limbs or gestures, invent straps or supports,
-duplicate hidden items, force full visibility, or add incidental reference styling props.
-Cropping and occlusion do not prove absence. If absence or feasible placement is uncertain, do not add.
-Necessary new contact, local shadows, occlusion and fabric loading are allowed without changing the pose.
-
 ${outfit_items}
 
 Subject context (advisory; Image 1 takes precedence over any conflicting text):
 ${subject_context}
 
-Treat the analysis as reference guidance, not a fault diagnosis or proof that an item is missing.
+Treat the analysis as reference guidance, not a fault diagnosis.
 Read complex logos, lettering, prints and textures directly from cited images; do not invent unreadable
 content or remove a detail merely because it is absent from the written analysis.
 Render materials under Image 1's illumination, matching local texture scale, sharpness, depth of field

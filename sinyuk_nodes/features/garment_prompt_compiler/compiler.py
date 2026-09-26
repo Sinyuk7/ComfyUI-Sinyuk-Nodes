@@ -167,7 +167,7 @@ def _parse_garment(value: object, index: int) -> _Garment:
     }
 
 
-def _parse_analysis(raw: str) -> _Analysis:
+def _parse_analysis(raw: str, *, allow_empty_garments: bool = False) -> _Analysis:
     try:
         value: object = json.loads(raw)
     except json.JSONDecodeError as exc:
@@ -213,7 +213,7 @@ def _parse_analysis(raw: str) -> _Analysis:
         "styling": _require_string(subject_value.get("styling"), "subject.styling"),
     }
     garments = _require_list(value_dict.get("garments"), "garments")
-    if not garments:
+    if not garments and not allow_empty_garments:
         raise ValueError("Invalid GarmentAnalysis JSON: garments cannot be empty.")
     return {
         "subject": subject,
@@ -298,7 +298,7 @@ def compile_prompt(
         raise ValueError(f"Unsupported garment prompt schema: {schema.name}.")
     if schema.schema != load_garment_analysis_schema(preset).schema:
         raise ValueError("Analysis Schema does not match the bundled preset.")
-    analysis = _parse_analysis(analysis_json)
+    analysis = _parse_analysis(analysis_json, allow_empty_garments=preset == "enhancement")
     item_blocks: list[str] = []
     for index, garment in enumerate(analysis["garments"], start=1):
         item_blocks.append(_render_item(index, garment, preset))

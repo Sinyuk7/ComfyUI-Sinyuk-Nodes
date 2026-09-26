@@ -168,7 +168,7 @@ def test_preset_context_drives_matching_prompt(preset: str) -> None:
     assert "Image 3: Simple rounded almond-toe flat" in prompt
     assert prompt.endswith("Keep the hands fixed.")
     if preset == "enhancement":
-        assert prompt.startswith("Enhance the outfit")
+        assert prompt.startswith("Refine the existing outfit")
         assert "Reference structure" in prompt
         assert "Replace the current outfit completely" not in prompt
     else:
@@ -209,3 +209,16 @@ def test_enhancement_omits_empty_sections_and_deduplicates_references() -> None:
     prompt = compile_prompt(json.dumps(data), schema=load_garment_analysis_schema("enhancement"))
     assert "Wearing and integration" in prompt
     assert "Wear naturally from the shoulder." in prompt
+
+
+def test_enhancement_allows_no_reliably_matching_reference_items() -> None:
+    data = json.loads(_fixture())
+    data["garments"] = []
+
+    prompt = compile_prompt(json.dumps(data), schema=load_garment_analysis_schema("enhancement"))
+
+    assert prompt.startswith("Refine the existing outfit in Image 1")
+    assert "Target item" not in prompt
+
+    with pytest.raises(ValueError, match="garments cannot be empty"):
+        compile_prompt(json.dumps(data), schema=load_garment_analysis_schema("replacement"))

@@ -2,8 +2,7 @@ Analyze these images for outfit enhancement.
 
 Use Image 1 as the base image. Preserve its composition, subject, existing outfit,
 lighting, color grading and tonal character.
-Use Images 2 onward to organize reliable item references, material characteristics and distinctive details
-for refinement, correction and plausible addition of clearly intended missing items, such as a bag or belt.
-Do not infer absence merely from occlusion or cropping.
+Use Images 2 onward to organize reliable references, material characteristics and distinctive details
+for items already present in Image 1.
 Keep the analysis concise and source-grounded. Do not turn it into an exhaustive fault diagnosis.
 For complex artwork and textures, prioritize accurate visual source references over verbal reconstruction.

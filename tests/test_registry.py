@@ -122,4 +122,4 @@ def test_enhancement_context_connects_to_builder() -> None:
         }
     )
     result = GarmentPromptCompiler.execute(analysis_json=analysis, schema=schema)
-    assert result.result[0].startswith("Enhance the outfit")
+    assert result.result[0].startswith("Refine the existing outfit")
