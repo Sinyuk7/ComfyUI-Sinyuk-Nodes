@@ -48,7 +48,7 @@ export COMFYUI_PATH="/Users/sinyuk/AIGC/ComfyUI"
 export PYTHONPATH="$COMFYUI_PATH:$PWD"
 export PYTHON="$COMFYUI_PATH/.venv/bin/python"
 
-$PYTHON" -m pytest
-$PYTHON" -m ruff check .
-$PYTHON" -m ruff format --check .
-$PYTHON" -m pyright --pythonpath "$PYTHON'''
+"$PYTHON" -m pytest
+"$PYTHON" -m ruff check .
+"$PYTHON" -m ruff format --check .
+"$PYTHON" -m pyright --pythonpath "$PYTHON"'''
