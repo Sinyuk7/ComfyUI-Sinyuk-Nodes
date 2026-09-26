@@ -7,15 +7,17 @@ import json
 import logging
 import math
 import re
-from collections.abc import Awaitable, Callable, Mapping
-from contextlib import AsyncExitStack
+from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
+from contextlib import AsyncExitStack, asynccontextmanager
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
+from time import monotonic
 from typing import TypeGuard, TypeVar
 from urllib.parse import urlsplit
 
 import aiohttp
 import torch
+from sinyuk_nodes.common.cancellation import CancellationState, run_blocking
 
 from .config import Config
 from .diagnostics import log_event, new_run_id
@@ -51,18 +53,7 @@ async def cancellable(
     awaitable: Awaitable[T], check_cancel: Callable[[], None] = lambda: None
 ) -> T:
     """Check the host signal while I/O is pending, then await cancellation cleanup."""
-    task = asyncio.ensure_future(awaitable)
-    try:
-        while True:
-            check_cancel()
-            done, _ = await asyncio.wait({task}, timeout=0.2)
-            if done:
-                check_cancel()
-                return await task
-    finally:
-        if not task.done():
-            task.cancel()
-        await asyncio.gather(task, return_exceptions=True)
+    return await CancellationState(check_cancel).wait(awaitable)
 
 
 def retry_after(value: str | None) -> float | None:
@@ -82,6 +73,8 @@ def retry_after(value: str | None) -> float | None:
 
 
 class GrsaiClient:
+    provider = "grsai"
+
     def __init__(
         self,
         config: Config,
@@ -97,7 +90,13 @@ class GrsaiClient:
     ) -> None:
         self.config = config
         self.api_key = api_key
-        self.check_cancel = check_cancel
+        self.cancellation = CancellationState(check_cancel)
+        self.check_cancel = self.cancellation.check
+        self.phase = "preparing"
+        self.exit_reason: str | None = None
+        self.submission_state = "not_started"
+        self.remote_cancel_result = "not_verified"
+        self.attempt = 0
         self.progress = progress
         self.task_id = None
         self.submitted = False
@@ -111,6 +110,7 @@ class GrsaiClient:
         self.generation_progress = None
         self._secrets: tuple[str, ...] = (api_key,)
         self.log_context = dict(log_context or {"run_id": new_run_id()})
+        self.log_context.setdefault("provider", self.provider)
 
     def _error(self, message: object, index: int | None = None) -> GrsaiError:
         return GrsaiError(clean_message(message, self._secrets), self.task_id, index)
@@ -121,8 +121,16 @@ class GrsaiClient:
         progress: int | float | None = None,
         details: dict[str, object] | None = None,
     ) -> None:
+        if stage != "succeeded":
+            self._set_phase({"running": "polling", "reconnecting": "polling"}.get(stage, stage))
         if self.progress:
             await self.progress(stage, progress, self.task_id, details or {})
+
+    def _set_phase(self, phase: str) -> None:
+        if phase != self.phase:
+            self.phase = phase
+            self.attempt = 0
+            log_event("task.phase", **self.log_context, phase=phase, task_id=self.task_id)
 
     async def _wait(self, seconds: float) -> None:
         await asyncio.sleep(seconds)
@@ -141,7 +149,20 @@ class GrsaiClient:
         *,
         json_body: Mapping[str, object] | None = None,
         params: Mapping[str, str] | None = None,
+        data: aiohttp.FormData | None = None,
     ) -> tuple[int, object, float | None]:
+        if json_body is not None and data is not None:
+            raise ValueError("JSON and multipart bodies are mutually exclusive.")
+        self.attempt += 1
+        started = monotonic()
+        if self.phase != "polling" or self.attempt == 1:
+            log_event(
+                "http.started",
+                **self.log_context,
+                phase=self.phase,
+                attempt=self.attempt,
+                task_id=self.task_id,
+            )
         async with session.request(
             method,
             self.config.base_url + path,
@@ -149,14 +170,27 @@ class GrsaiClient:
             timeout=self._timeout(timeout),
             allow_redirects=False,
             json=json_body,
+            data=data,
             params=params,
         ) as response:
             raw = await response.read()
+            log_event(
+                "http.response",
+                level=logging.DEBUG
+                if self.phase == "polling" and response.status < 400
+                else logging.INFO,
+                **self.log_context,
+                phase=self.phase,
+                attempt=self.attempt,
+                task_id=self.task_id,
+                http_status=response.status,
+                elapsed_ms=round((monotonic() - started) * 1000),
+            )
             try:
-                data: object = json.loads(raw)
+                decoded: object = json.loads(raw)
             except (ValueError, UnicodeError):
-                data = None
-            return response.status, data, retry_after(response.headers.get("Retry-After"))
+                decoded = None
+            return response.status, decoded, retry_after(response.headers.get("Retry-After"))
 
     def _remember_id(self, data: object) -> None:
         if not _is_string_mapping(data) or "id" not in data:
@@ -206,6 +240,12 @@ class GrsaiClient:
         self.http_status = status
         previous = self.task_id
         self._remember_id(data)
+        if self.task_id:
+            self.submission_state = "accepted"
+            self.submission_unknown = False
+        elif self.phase == "submitting" and status in {400, 401, 403, 404, 422, 429}:
+            self.submission_state = "rejected"
+            self.submission_unknown = False
         state = data.get("status") if _is_string_mapping(data) else None
         if isinstance(state, str) and state.lower() in {
             "create",
@@ -218,6 +258,9 @@ class GrsaiClient:
             "violation",
         }:
             self.remote_status = state
+        if self.remote_status in {"succeeded", "SUCCESS"}:
+            self.submission_state = "accepted"
+            self.submission_unknown = False
         # This is an awaited business boundary, not a best-effort UI notification.
         if self.task_id and previous is None and self.accepted:
             await self.accepted(self.task_id, self.remote_status)
@@ -236,38 +279,57 @@ class GrsaiClient:
                 else []
             ),
         )
+        started = monotonic()
         try:
             operation = self._generate(request)
             limit = self.config.transport.task_timeout_seconds
             if limit is not None:
                 operation = asyncio.wait_for(operation, timeout=limit)
-            return await cancellable(operation, self.check_cancel)
+            images = await self.cancellation.wait(operation)
+            self.exit_reason = "completed"
+            self.submission_state = "accepted"
+            self.submission_unknown = False
+            return images
         except TimeoutError:
+            self.exit_reason = "timeout"
             raise self._error(
                 "Local total task deadline reached; remote task may still be running."
             ) from None
         except BaseException:
-            if self.submitted:
-                logger.info(
-                    "GRSAI local execution ended task_id=%s; remote state is not changed",
-                    self.task_id or "unknown",
-                )
+            self.exit_reason = "interrupted" if self.cancellation.reason else "failed"
             raise
+        finally:
+            log_event(
+                "task.finished",
+                **self.log_context,
+                phase=self.phase,
+                exit_reason=self.exit_reason,
+                submission_state=self.submission_state,
+                task_id=self.task_id,
+                remote_state=self.remote_status,
+                remote_cancel_result=self.remote_cancel_result,
+                elapsed_ms=round((monotonic() - started) * 1000),
+            )
+
+    @asynccontextmanager
+    async def _sessions(self) -> AsyncIterator[tuple[aiohttp.ClientSession, aiohttp.ClientSession]]:
+        # Authentication is attached to API requests, never CDN sessions.
+        async with AsyncExitStack() as stack:
+            if self.sessions is not None:
+                yield self.sessions
+            else:
+                api = await stack.enter_async_context(aiohttp.ClientSession())
+                cdn = await stack.enter_async_context(aiohttp.ClientSession())
+                yield api, cdn
 
     async def _generate(self, request: Mapping[str, object]) -> list[torch.Tensor]:
         t = self.config.transport
-        # No default authentication on either session: credentials are API-request-only.
-        async with AsyncExitStack() as stack:
-            if self.sessions is None:
-                api = await stack.enter_async_context(aiohttp.ClientSession())
-                cdn = await stack.enter_async_context(aiohttp.ClientSession())
-                sessions = (api, cdn)
-            else:
-                sessions = self.sessions
-            api, cdn = sessions
+        async with self._sessions() as (api, cdn):
             await self._notify("submitting")
             self.check_cancel()
             self.submitted = True
+            self.submission_state = "unknown"
+            self.submission_unknown = True
             try:
                 status, data, delay = await self._json(
                     api, "POST", "/v1/api/generate", t.submit_timeout_seconds, json_body=request
@@ -282,7 +344,7 @@ class GrsaiClient:
             try:
                 state = self._validate(status, data)
             except GrsaiError as exc:
-                if not self.task_id:
+                if self.submission_unknown:
                     raise self._error(
                         f"{exc} Remote task creation is uncertain; POST was not retried."
                     ) from None
@@ -381,6 +443,7 @@ class GrsaiClient:
             for index, url in enumerate(urls, 1):
                 image = await self._download(cdn, url, index)
                 if self.result:
+                    self._set_phase("saving")
                     await self.result(image, index, len(urls))
                 images.append(image)
                 await self._notify(
@@ -393,14 +456,26 @@ class GrsaiClient:
         raise self._error("Image download retry loop ended unexpectedly.")
 
     async def _download(self, session: aiohttp.ClientSession, url: str, index: int) -> torch.Tensor:
+        self._set_phase("downloading")
         t = self.config.transport
         for attempt in range(t.download_retry_limit + 1):
             delay = None
+            started = monotonic()
             try:
                 async with session.get(
                     url, timeout=self._timeout(t.download_timeout_seconds)
                 ) as response:
                     delay = retry_after(response.headers.get("Retry-After"))
+                    log_event(
+                        "download.response",
+                        **self.log_context,
+                        phase=self.phase,
+                        attempt=attempt + 1,
+                        task_id=self.task_id,
+                        result_index=index,
+                        http_status=response.status,
+                        elapsed_ms=round((monotonic() - started) * 1000),
+                    )
                     if not 200 <= response.status < 300:
                         if response.status not in RETRYABLE_HTTP_STATUSES:
                             raise self._error(f"Image download HTTP {response.status}.", index)
@@ -414,8 +489,7 @@ class GrsaiClient:
                             )
                     else:
                         data = await response.read()
-                        # Decode on this thread to avoid detached CPU workers after cancellation.
-                        image = decode_image(data)
+                        image = await run_blocking(decode_image, data)
                         self.check_cancel()
                         return image
             except ValueError as exc:

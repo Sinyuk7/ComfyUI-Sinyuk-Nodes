@@ -17,6 +17,7 @@ from uuid import uuid4
 
 import torch
 from PIL import Image
+from sinyuk_nodes.common.cancellation import finish_owned, run_blocking
 
 from .batch_plan import BatchPlan
 
@@ -38,6 +39,9 @@ class TaskRecord(TypedDict):
     error: str | None
     outputs: list[OutputRecord]
     submission_state: NotRequired[str]
+    phase: NotRequired[str]
+    exit_reason: NotRequired[str | None]
+    remote_cancel_result: NotRequired[str]
 
 
 class BatchSummary(TypedDict):
@@ -141,6 +145,10 @@ class BatchStore:
                 "submitted": False,
                 "error": None,
                 "outputs": [],
+                "submission_state": "not_started",
+                "phase": "preparing",
+                "exit_reason": None,
+                "remote_cancel_result": "not_verified",
             }
             for task in plan.tasks()
         ]
@@ -200,18 +208,20 @@ class BatchStore:
     async def update(self, index: int, **changes: object) -> None:
         async with self.lock:
             self.state["tasks"][index - 1].update(changes)
-            self._write()
+            await run_blocking(self._write)
 
     async def save(
+        self, task_index: int, image: torch.Tensor, result_index: int, result_count: int
+    ) -> None:
+        await finish_owned(self._save(task_index, image, result_index, result_count))
+
+    async def _save(
         self, task_index: int, image: torch.Tensor, result_index: int, result_count: int
     ) -> None:
         async with self.lock:
             suffix = f"_{result_index:02d}" if result_count > 1 else ""
             name = f"{self.prefix}_{task_index:03d}{suffix}.png"
-            pixels = (image[0].detach().cpu().float().numpy() * 255).round().astype("uint8")
-            self._atomic(
-                self.path / name, lambda stream: Image.fromarray(pixels).save(stream, format="PNG")
-            )
+            await run_blocking(self._save_image, self.path / name, image)
             self.images[(task_index, result_index)] = image
             self.state["tasks"][task_index - 1]["outputs"].append(
                 {
@@ -220,7 +230,11 @@ class BatchStore:
                     "flat_output_index": None,
                 }
             )
-            self._write()
+            await run_blocking(self._write)
+
+    def _save_image(self, destination: Path, image: torch.Tensor) -> None:
+        pixels = (image[0].detach().cpu().float().numpy() * 255).round().astype("uint8")
+        self._atomic(destination, lambda stream: Image.fromarray(pixels).save(stream, format="PNG"))
 
     async def finish(
         self, status: str, error: str | None = None, interrupted_tasks: bool = False
@@ -230,8 +244,14 @@ class BatchStore:
             if interrupted_tasks:
                 for task in self.state["tasks"]:
                     if task["status"] == "running":
-                        task["status"] = "interrupted"
-                        if task["submitted"] and not task["remote_task_id"]:
+                        task["status"] = "interrupted" if status == "interrupted" else "failed"
+                        if task.get("exit_reason") is None:
+                            task["exit_reason"] = status
+                        if (
+                            task["submitted"]
+                            and not task["remote_task_id"]
+                            and task.get("submission_state") != "rejected"
+                        ):
                             task["submission_state"] = "unknown"
             if not interrupted_tasks and status != "interrupted":
                 for flat, (task, result) in enumerate(sorted(self.images)):
@@ -248,5 +268,5 @@ class BatchStore:
                 "interrupted_tasks": sum(t["status"] == "interrupted" for t in tasks),
                 "saved_images": len(self.images),
             }
-            self._write()
+            await run_blocking(self._write)
         return [self.images[key] for key in sorted(self.images)]

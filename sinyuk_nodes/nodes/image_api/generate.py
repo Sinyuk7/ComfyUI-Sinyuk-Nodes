@@ -7,6 +7,8 @@ import logging
 import time
 
 from comfy_api.latest import io
+from sinyuk_nodes.common.cancellation import CancellationState, run_blocking
+from sinyuk_nodes.compat.comfy import check_interrupt
 
 from ...features.image_api.client import GrsaiClient
 from ...features.image_api.config import get_config
@@ -107,15 +109,15 @@ class ImageGenerate(io.ComfyNode):
         ui = None
         interrupted = False
 
-        def check_cancel():
-            # Do not consume/reset the global interrupt flag: other async nodes need it too.
-            if model_management.processing_interrupted():
-                raise model_management.InterruptProcessingException()
+        cancellation = CancellationState(check_interrupt)
+        check_cancel = cancellation.check
 
         try:
             check_cancel()
             enforce_size_limits = settings.provider != "runninghub"
-            files = encode_image_files(images, check_cancel, enforce_size_limits)
+            files = await cancellation.wait(
+                run_blocking(encode_image_files, images, enforce_size_limits=enforce_size_limits)
+            )
             if not files:
                 raise ValueError("Connect 1 to 10 reference images.")
             validate_reference_files(files, enforce_size_limits)

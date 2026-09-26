@@ -18,7 +18,6 @@ from .client import (
     Pressure,
     Progress,
     Result,
-    cancellable,
 )
 from .diagnostics import log_event
 from .errors import clean_message
@@ -35,6 +34,8 @@ def _is_object_list(value: object) -> TypeGuard[list[object]]:
 
 
 class RunningHubClient(GrsaiClient):
+    provider = "runninghub"
+
     def __init__(
         self,
         config: Config,
@@ -85,7 +86,7 @@ class RunningHubClient(GrsaiClient):
         if not self.task_id:
             self.task_id = task_id
             logger.info("RunningHub task accepted task_id=%s", task_id)
-            log_event("task.accepted", **self.log_context, provider="runninghub", task_id=task_id)
+            log_event("task.accepted", **self.log_context, task_id=task_id)
 
     def _validate(self, status: int, data: object, allow_created: bool = False) -> str:
         self._remember_id(data)
@@ -139,9 +140,8 @@ class RunningHubClient(GrsaiClient):
                     data=form,
                 )
                 self.http_status = status
-                url = (
-                    (data.get("data") or {}).get("download_url") if isinstance(data, dict) else None
-                )
+                nested = data.get("data") if _is_json_object(data) else None
+                url = nested.get("download_url") if _is_json_object(nested) else None
                 if (
                     200 <= status < 300
                     and isinstance(data, dict)
@@ -177,7 +177,8 @@ class RunningHubClient(GrsaiClient):
             ]
 
     async def upload_images(self, contents: list[bytes]) -> list[str]:
-        return await cancellable(self._upload_images(contents), self.check_cancel)
+        await self._notify("uploading")
+        return await self.cancellation.wait(self._upload_images(contents))
 
     async def _generate(self, request: Mapping[str, object]) -> list[torch.Tensor]:
         t = self.config.transport
@@ -185,6 +186,8 @@ class RunningHubClient(GrsaiClient):
             await self._notify("submitting")
             self.check_cancel()
             self.submitted = True
+            self.submission_state = "unknown"
+            self.submission_unknown = True
             try:
                 status, data, delay = await self._json(
                     api, "POST", self.endpoint, t.submit_timeout_seconds, json_body=request
@@ -251,6 +254,7 @@ class RunningHubClient(GrsaiClient):
             for index, url in enumerate(urls, 1):
                 image = await self._download(cdn, url, index)
                 if self.result:
+                    self._set_phase("saving")
                     await self.result(image, index, len(urls))
                 images.append(image)
                 await self._notify(

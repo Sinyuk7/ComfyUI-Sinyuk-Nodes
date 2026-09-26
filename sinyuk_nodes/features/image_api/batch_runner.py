@@ -14,10 +14,11 @@ from typing import Literal
 
 import aiohttp
 import torch
+from sinyuk_nodes.common.cancellation import CancellationState, drain, finish_owned, run_blocking
 
 from .batch_plan import BatchPlan, TaskSpec, validate_options
 from .batch_storage import BatchStore, StorageError
-from .client import Config, GrsaiClient, cancellable
+from .client import Config, GrsaiClient
 from .diagnostics import log_event, new_run_id
 from .errors import GrsaiError, clean_message
 from .images import encode_file_payloads, encode_image_files, validate_reference_files
@@ -62,7 +63,13 @@ class BatchRunner:
         self.runninghub_profile = (
             get_runninghub_catalog().profile(model) if provider == "runninghub" else None
         )
-        self.concurrency, self.check_cancel, self.progress = concurrency, check_cancel, progress
+        self.cancellation = CancellationState(check_cancel)
+        self.concurrency, self.check_cancel, self.progress = (
+            concurrency,
+            self.cancellation.check,
+            progress,
+        )
+        self.encode_lock = asyncio.Lock()
         self.store = BatchStore(
             output_root,
             plan,
@@ -136,15 +143,21 @@ class BatchRunner:
                 return
             await asyncio.sleep(min(remaining, 0.2))
 
-    def _images(self, base: int) -> list[bytes]:
+    async def _images(self, base: int) -> list[bytes]:
         images: list[bytes] = []
         for col, column in enumerate(self.plan.columns):
             index = self.plan.input_index(col, base)
             cache_key = col, index
-            if cache_key not in self.encoded:
-                self.encoded[cache_key] = encode_image_files(
-                    [column.images[index]], self.check_cancel, self.provider != "runninghub"
-                )[0]
+            async with self.encode_lock:
+                self.check_cancel()
+                if cache_key not in self.encoded:
+                    files = await run_blocking(
+                        encode_image_files,
+                        [column.images[index]],
+                        enforce_size_limits=self.provider != "runninghub",
+                    )
+                    self.check_cancel()
+                    self.encoded[cache_key] = files[0]
             images.append(self.encoded[cache_key])
         return images
 
@@ -210,9 +223,9 @@ class BatchRunner:
             await self.store.save(spec.task_index, image, index, count)
 
         try:
-            files = self._images(spec.base_index)
+            files = await self._images(spec.base_index)
             validate_reference_files(files, self.provider != "runninghub")
-            # Encoding is synchronous. Re-check pressure and fatal state before committing a POST.
+            # Re-check pressure and fatal state after image preparation.
             await self._wait_to_submit()
             if self.fatal:
                 return
@@ -246,6 +259,7 @@ class BatchRunner:
                     endpoint=self.runninghub_profile.endpoint,
                     **common,
                 )
+                client._set_phase("uploading")
                 urls = await self._runninghub_urls(client, files)
                 request = build_runninghub_request(
                     self.model,
@@ -266,6 +280,11 @@ class BatchRunner:
                 client = GrsaiClient(
                     self.config, self.key, self.check_cancel, task_progress, **common
                 )
+            await self._wait_to_submit()
+            if self.fatal:
+                await self.store.update(spec.task_index, status="pending")
+                return
+            self.check_cancel()
             await client.generate(request)
             await self.store.update(
                 spec.task_index, status="succeeded", remote_status=client.remote_status
@@ -305,11 +324,17 @@ class BatchRunner:
                 self.submitted |= client.submitted
                 unwinding = sys.exc_info()[0] is not None
                 try:
-                    await self.store.update(
-                        spec.task_index,
-                        submitted=client.submitted,
-                        remote_status=client.remote_status,
-                        remote_task_id=client.task_id,
+                    await finish_owned(
+                        self.store.update(
+                            spec.task_index,
+                            submitted=client.submitted,
+                            remote_status=client.remote_status,
+                            remote_task_id=client.task_id,
+                            phase=client.phase,
+                            exit_reason=client.exit_reason,
+                            submission_state=client.submission_state,
+                            remote_cancel_result=client.remote_cancel_result,
+                        )
                     )
                 except StorageError:
                     if not unwinding:
@@ -339,15 +364,13 @@ class BatchRunner:
             try:
                 await asyncio.gather(*workers)
             finally:
-                for task in workers:
-                    if not task.done():
+                log_event("batch.cleanup.started", run_id=self.run_id)
+                owned = [*workers, *self.uploaded.values()]
+                for task in owned:
+                    if not task.done() and not task.cancelling():
                         task.cancel()
-                await asyncio.gather(*workers, return_exceptions=True)
-                uploads = list(self.uploaded.values())
-                for task in uploads:
-                    if not task.done():
-                        task.cancel()
-                await asyncio.gather(*uploads, return_exceptions=True)
+                await drain(asyncio.gather(*owned, return_exceptions=True))
+                log_event("batch.cleanup.completed", run_id=self.run_id)
 
     async def run(self) -> tuple[list[torch.Tensor], str]:
         started = time.monotonic()
@@ -362,18 +385,16 @@ class BatchRunner:
         )
         await self._emit("planned")
         try:
-            await cancellable(self._execute(), self.check_cancel)
+            await self.cancellation.wait(self._execute())
         except BaseException as exc:
-            interrupted = isinstance(exc, asyncio.CancelledError)
-            try:
-                self.check_cancel()
-            except BaseException:
-                interrupted = True
+            interrupted = self.cancellation.reason is not None
             status = "interrupted" if interrupted else "failed"
             error = clean_message(str(exc), (self.key, *self.plan.prompts))
-            with suppress(StorageError):
-                await self.store.finish(status, error, interrupted_tasks=True)
-            await self._emit(status)
+            cleanup = asyncio.create_task(self.store.finish(status, error, interrupted_tasks=True))
+            await drain(cleanup)
+            if not cleanup.cancelled() and cleanup.exception() is not None:
+                log_event("batch.cleanup.failed", level=logging.ERROR, run_id=self.run_id)
+            await drain(asyncio.create_task(self._emit(status)))
             log_event(
                 "batch.interrupted" if interrupted else "batch.failed",
                 level=logging.WARNING if interrupted else logging.ERROR,

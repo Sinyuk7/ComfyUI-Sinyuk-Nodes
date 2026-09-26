@@ -4,16 +4,24 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import os
 from pathlib import Path
+from time import monotonic
 from typing import TypeGuard
+from uuid import uuid4
 
 import httpx
+from sinyuk_nodes.common.cancellation import CancellationState
 from sinyuk_nodes.compat.comfy import check_interrupt
 
 
 class OpenAPIRequestError(RuntimeError):
     """An API request failed without exposing credentials."""
+
+    def __init__(self, message: str, *, submission_unknown: bool = False) -> None:
+        super().__init__(message)
+        self.submission_unknown = submission_unknown
 
 
 _RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
@@ -109,22 +117,13 @@ async def _request(
     *,
     headers: dict[str, str],
     payload: dict[str, object] | None = None,
+    cancellation: CancellationState | None = None,
 ) -> httpx.Response:
     """Run one HTTP request and cancel its task when ComfyUI interrupts."""
 
-    check_interrupt()
-    request = asyncio.create_task(client.request(method, url, headers=headers, json=payload))
-    try:
-        while not request.done():
-            check_interrupt()
-            await asyncio.wait((request,), timeout=_INTERRUPT_POLL_INTERVAL)
-        check_interrupt()
-        return request.result()
-    except BaseException:
-        if not request.done():
-            request.cancel()
-        await asyncio.gather(request, return_exceptions=True)
-        raise
+    state = cancellation or CancellationState(check_interrupt)
+    state.check()
+    return await state.wait(client.request(method, url, headers=headers, json=payload))
 
 
 async def fetch_models(base_url: str, api_key: str) -> tuple[str, ...]:
@@ -185,88 +184,90 @@ async def fetch_models(base_url: str, api_key: str) -> tuple[str, ...]:
     ) from last_error
 
 
-async def complete_chat(base_url: str, api_key: str, payload: dict[str, object]) -> object:
-    """Send one chat completion request and return its decoded JSON payload."""
+async def _complete(
+    base_url: str,
+    api_key: str,
+    payload: dict[str, object],
+    path: str,
+    cancellation: CancellationState | None = None,
+) -> object:
+    state = cancellation or CancellationState(check_interrupt)
+    run_id = uuid4().hex[:12]
+    started = monotonic()
+    submission = "not_started"
+    outcome = "failed"
+    status: int | None = None
+    logger = logging.getLogger(__name__)
 
-    url = f"{base_url}/chat/completions"
-    last_error: Exception | None = None
-    async with httpx.AsyncClient(timeout=httpx.Timeout(180.0, connect=15.0)) as client:
-        for attempt in range(3):
-            try:
-                response = await _request(
-                    client,
-                    "POST",
-                    url,
-                    headers={"Authorization": f"Bearer {api_key}"},
-                    payload=payload,
+    async def submit() -> object:
+        nonlocal submission, outcome, status
+        async with httpx.AsyncClient(timeout=httpx.Timeout(180.0, connect=15.0)) as client:
+            state.check()
+            submission = "unknown"
+            logger.info("llm.submit run_id=%s phase=submitting attempt=1", run_id)
+            response = await _request(
+                client,
+                "POST",
+                f"{base_url}/{path}",
+                headers={"Authorization": f"Bearer {api_key}"},
+                payload=payload,
+                cancellation=state,
+            )
+            status = response.status_code
+            if status >= 400:
+                if status in {400, 401, 403, 404, 422, 429}:
+                    submission = "rejected"
+                raise OpenAPIRequestError(
+                    _error_message(response, api_key) + " Generation POST was not retried.",
+                    submission_unknown=submission == "unknown",
                 )
-                if response.status_code >= 400:
-                    error = OpenAPIRequestError(_error_message(response, api_key))
-                    if response.status_code in _RETRYABLE_STATUS_CODES and attempt < 2:
-                        last_error = error
-                        await _sleep_with_interrupt(0.5 * (attempt + 1))
-                        continue
-                    raise error
-                return response.json()
-            except (httpx.TimeoutException, httpx.NetworkError, OSError) as exc:
-                last_error = exc
-                if attempt < 2:
-                    await _sleep_with_interrupt(0.5 * (attempt + 1))
-                    continue
-                break
-            except httpx.HTTPError as exc:
-                last_error = exc
-                break
-            except (ValueError, OpenAPIRequestError) as exc:
-                last_error = exc
-                break
-    raise OpenAPIRequestError(
-        str(last_error)
-        if isinstance(last_error, OpenAPIRequestError)
-        else "The OpenAI-compatible chat request failed."
-    ) from last_error
+            result: object = response.json()
+            submission = "accepted"
+            outcome = "completed"
+            return result
+
+    try:
+        return await state.wait(submit())
+    except (httpx.HTTPError, OSError, ValueError) as exc:
+        raise OpenAPIRequestError(
+            "Generation response lost or invalid; submission_unknown=true. "
+            "A remote request may already exist. POST was not retried.",
+            submission_unknown=True,
+        ) from exc
+    except BaseException:
+        if state.reason is not None:
+            outcome = "interrupted"
+        raise
+    finally:
+        logger.info(
+            "llm.finished run_id=%s phase=submitting attempt=1 http_status=%s "
+            "submission_state=%s outcome=%s elapsed_ms=%s",
+            run_id,
+            status,
+            submission,
+            outcome,
+            round((monotonic() - started) * 1000),
+        )
 
 
-async def complete_response(base_url: str, api_key: str, payload: dict[str, object]) -> object:
-    """Send one Responses API request and return its decoded JSON payload."""
+async def complete_chat(
+    base_url: str,
+    api_key: str,
+    payload: dict[str, object],
+    cancellation: CancellationState | None = None,
+) -> object:
+    """Submit once; a lost response must not cause duplicate generation."""
+    return await _complete(base_url, api_key, payload, "chat/completions", cancellation)
 
-    url = f"{base_url}/responses"
-    last_error: Exception | None = None
-    async with httpx.AsyncClient(timeout=httpx.Timeout(180.0, connect=15.0)) as client:
-        for attempt in range(3):
-            try:
-                response = await _request(
-                    client,
-                    "POST",
-                    url,
-                    headers={"Authorization": f"Bearer {api_key}"},
-                    payload=payload,
-                )
-                if response.status_code >= 400:
-                    error = OpenAPIRequestError(_error_message(response, api_key))
-                    if response.status_code in _RETRYABLE_STATUS_CODES and attempt < 2:
-                        last_error = error
-                        await _sleep_with_interrupt(0.5 * (attempt + 1))
-                        continue
-                    raise error
-                return response.json()
-            except (httpx.TimeoutException, httpx.NetworkError, OSError) as exc:
-                last_error = exc
-                if attempt < 2:
-                    await _sleep_with_interrupt(0.5 * (attempt + 1))
-                    continue
-                break
-            except httpx.HTTPError as exc:
-                last_error = exc
-                break
-            except (ValueError, OpenAPIRequestError) as exc:
-                last_error = exc
-                break
-    raise OpenAPIRequestError(
-        str(last_error)
-        if isinstance(last_error, OpenAPIRequestError)
-        else "The Responses API request failed."
-    ) from last_error
+
+async def complete_response(
+    base_url: str,
+    api_key: str,
+    payload: dict[str, object],
+    cancellation: CancellationState | None = None,
+) -> object:
+    """Submit a synchronous response once, without speculative idempotency."""
+    return await _complete(base_url, api_key, payload, "responses", cancellation)
 
 
 __all__ = [

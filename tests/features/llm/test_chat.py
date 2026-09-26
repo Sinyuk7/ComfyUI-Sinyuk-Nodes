@@ -280,3 +280,88 @@ async def test_http_request_propagates_comfy_interrupt(monkeypatch: pytest.Monke
                 "https://example.test",
                 headers={},
             )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("api", [client.complete_chat, client.complete_response])
+@pytest.mark.parametrize("failure", ["read_timeout", "503", "429"])
+async def test_generation_post_is_not_retried(monkeypatch, api, failure: str) -> None:
+    attempts = 0
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal attempts
+        attempts += 1
+        if failure == "read_timeout":
+            raise httpx.ReadTimeout("response lost", request=request)
+        return httpx.Response(int(failure), json={"error": "unavailable"})
+
+    factory = httpx.AsyncClient
+    monkeypatch.setattr(
+        client.httpx,
+        "AsyncClient",
+        lambda **kwargs: factory(transport=httpx.MockTransport(handler), **kwargs),
+    )
+    with pytest.raises(client.OpenAPIRequestError) as error:
+        await api("https://example.test", "secret", {"prompt": "private"})
+    assert attempts == 1
+    assert error.value.submission_unknown == (failure != "429")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("cleanup_fails", [False, True])
+async def test_latched_cancel_survives_host_reset_and_repeated_task_cancel(
+    cleanup_fails: bool,
+) -> None:
+    import asyncio
+
+    from sinyuk_nodes.common.cancellation import CancellationState
+
+    signal = False
+    cleanup_started = asyncio.Event()
+    release_cleanup = asyncio.Event()
+    cleaned = False
+
+    def check() -> None:
+        if signal:
+            raise InterruptProcessingException()
+
+    state = CancellationState(check)
+
+    async def request() -> None:
+        nonlocal cleaned
+        try:
+            await asyncio.Event().wait()
+        finally:
+            cleanup_started.set()
+            await release_cleanup.wait()
+            cleaned = True
+            if cleanup_fails:
+                raise RuntimeError("cleanup failed")
+
+    task = asyncio.create_task(state.wait(request()))
+    await asyncio.sleep(0)
+    signal = True
+    await asyncio.wait_for(cleanup_started.wait(), 2)
+    signal = False
+    task.cancel()
+    await asyncio.sleep(0)
+    task.cancel()
+    release_cleanup.set()
+    with pytest.raises(InterruptProcessingException):
+        await task
+    assert cleaned
+    with pytest.raises(InterruptProcessingException):
+        state.check()
+
+
+def test_host_check_does_not_consume_interrupt() -> None:
+    from comfy import model_management
+    from sinyuk_nodes.compat.comfy import check_interrupt
+
+    model_management.interrupt_current_processing(True)
+    try:
+        for _ in range(2):
+            with pytest.raises(InterruptProcessingException):
+                check_interrupt()
+    finally:
+        model_management.interrupt_current_processing(False)

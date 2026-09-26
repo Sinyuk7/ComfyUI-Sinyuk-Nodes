@@ -10,7 +10,8 @@ def check_interrupt() -> None:
 
     from comfy import model_management
 
-    model_management.throw_exception_if_processing_interrupted()
+    if model_management.processing_interrupted():
+        raise model_management.InterruptProcessingException()
 
 
 __all__ = ["ComfyAPI", "ComfyExtension", "check_interrupt", "io", "ui"]

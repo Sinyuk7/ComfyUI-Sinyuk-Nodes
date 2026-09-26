@@ -5,6 +5,8 @@ from __future__ import annotations
 import asyncio
 
 from comfy_api.latest import io
+from sinyuk_nodes.common.cancellation import CancellationState, run_blocking
+from sinyuk_nodes.compat.comfy import check_interrupt
 
 from ...features.image_api.api_settings import require_api_config
 from ...features.image_api.batch_plan import plan_batch, validate_options
@@ -17,13 +19,6 @@ from .config import APIConfigType
 from .schema import model_input_options
 
 ReferenceType = io.Custom("SINYUK_IMAGE_API_REFERENCES")
-
-
-def check_cancel():
-    from comfy import model_management
-
-    if model_management.processing_interrupted():
-        raise model_management.InterruptProcessingException()
 
 
 class ImageAPILoadImagesFromFolder(io.ComfyNode):
@@ -76,7 +71,7 @@ class ImageAPILoadImagesFromFolder(io.ComfyNode):
 
     @classmethod
     def execute(cls, folder):
-        references = load_folder(scalar(folder, "folder"), check_cancel)
+        references = load_folder(scalar(folder, "folder"), check_interrupt)
         return io.NodeOutput(
             references,
             list(references.images),
@@ -213,13 +208,17 @@ class BatchImageGenerate(io.ComfyNode):
         )
         validate_options(concurrency, prefix, key)
         profile = provider_profile(settings, selected)
-        plan = plan_batch(
-            references,
-            prompt,
-            prompts,
-            local_limit=min(config.batch_reference_limit, 10),
-            model_limit=profile.max_reference_images,
-            check_cancel=check_cancel,
+        cancellation = CancellationState(check_interrupt)
+        check_cancel = cancellation.check
+        plan = await cancellation.wait(
+            run_blocking(
+                plan_batch,
+                references,
+                prompt,
+                prompts,
+                local_limit=min(config.batch_reference_limit, 10),
+                model_limit=profile.max_reference_images,
+            )
         )
         check_cancel()
         ui = execution_ui(cls.hidden, config, settings.token, settings.provider)
