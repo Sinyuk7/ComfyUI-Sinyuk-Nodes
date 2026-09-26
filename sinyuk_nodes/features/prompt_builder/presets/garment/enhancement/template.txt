@@ -22,5 +22,3 @@ Read complex logos, lettering, prints and textures directly from cited images; d
 content or remove a detail merely because it is absent from the written analysis.
 Render materials under Image 1's illumination, matching local texture scale, sharpness, depth of field
 and grain. Avoid exaggerated microtexture, oversharpening, plastic surfaces and new wind or billowing.
-
-${extra_prompt}

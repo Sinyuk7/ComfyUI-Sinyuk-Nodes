@@ -200,11 +200,11 @@ def test_responses_payload_keeps_every_image_input() -> None:
     assert content[7]["text"] == "Image 4:"
 
 
-def test_schema_validation_requires_strict_object_properties() -> None:
-    with pytest.raises(ValueError, match="required"):
+def test_schema_validation_rejects_invalid_schema_keywords() -> None:
+    with pytest.raises(ValueError, match="JSON Schema is invalid"):
         parse_json_schema(
             '{"type":"object","properties":{"status":{"type":"string"}},'
-            '"required":[],"additionalProperties":false}'
+            '"required":"status","additionalProperties":false}'
         )
 
 

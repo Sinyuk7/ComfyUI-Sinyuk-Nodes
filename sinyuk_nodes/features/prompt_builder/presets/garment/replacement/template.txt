@@ -36,5 +36,3 @@ collapsed fabric, random wrinkling, or artificially inflated volume.
 When appropriate for the garment type, fabric, pose, and framing, allow subtle natural motion that helps reveal shape, drape, and dimensionality. Keep the motion physically plausible and preserve the intended silhouette and important details.
 
 Rebuild garment edges, overlaps, occlusion, folds, and contact naturally so the outfit looks genuinely worn by the subject.
-
-${extra_prompt}

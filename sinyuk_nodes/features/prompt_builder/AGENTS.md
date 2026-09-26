@@ -1,17 +1,17 @@
-`sinyuk_nodes/features/garment_prompt_compiler/` 实现一个两阶段的服装换装提示词流程：
+`sinyuk_nodes/features/prompt_builder/` 实现一个两阶段的服装换装提示词流程：
 
 ```text
 Image 1 人物图
 + Images 2..N 目标穿搭参考图
         ↓
 Vision LLM
-(system_prompt.txt + user_prompt.txt + schema.json)
+(system.txt + user.txt + schema.json)
         ↓
 GarmentAnalysis JSON
         ↓
 compiler.py
         ↓
-garment_replacement.txt + outfit_item.txt
+template.txt + templates/outfit_item.txt
         ↓
 最终 Image Editing Prompt
         ↓
@@ -20,12 +20,12 @@ Nano Banana / GPT Image
 
 核心职责：
 
-* `system_prompt.txt`：定义 Vision LLM 的分析规则和图片角色。
-* `user_prompt.txt`：触发当前图片分析任务，保持简洁。
+* `system.txt`：定义 Vision LLM 的分析规则和图片角色。
+* `user.txt`：触发当前图片分析任务，保持简洁。
 * `schema.json`：定义 `GarmentAnalysis JSON` 的固定数据结构。
 * `compiler.py`：纯 Python 编译器，把 JSON 确定性组装成最终 Prompt，不调用 LLM、不重新推理。
 * `outfit_item.txt`：单个服装 / 鞋 / 包 / 配件的 Prompt 模板。
-* `garment_replacement.txt`：最终换装 Prompt 的全局模板。
+* `template.txt`：最终换装 Prompt 的全局模板。
 * `__init__.py`：Feature 的导出和注册入口。
 
 核心边界：
@@ -59,10 +59,11 @@ Reference 应遵循“最小充分引用”：整体版型使用必要的 `main_
 V2 协议删除 `id`、`must_preserve` 和 `priority`。`shape` 表达固有版型结构，`key_details` 按重要性顺序表达超出 shape 的显著细节，`subject.styling` 仅承载 Image 1 的兼容穿搭先验。
 
 
-资源按 presets/replacement 与 presets/enhancement 分组。Context 保留三个输出；
-schema 同时连接通用 LLM 和 Prompt Builder。schema.name 分别为
-garment_replacement / garment_enhancement；两者共用 V2 结构、校验与渲染逻辑，
-按身份选择模板，不修改通用 LLM 节点。
+资源由 preset manifest、system/user prompt、单一 schema.json 和可选模板组成。
+Prompt Context 输出 system prompt、user prompt、JSON Schema 和 Prompt Context；
+Schema Placement 只决定 schema 是否写入 system prompt，不配置 LLM 的 response format。
+Prompt Builder 接收 Prompt Context 与 LLM response，使用 jsonschema 校验后按 compiler
+路由；Garment 是当前已有的一个 compiler，不修改通用 LLM 节点。
 
 Enhancement 保留原图人物、姿势、构图、背景、灯光、色调影调及已有穿搭整体轮廓；
 参考图只用于原图中已有服装和配饰的可靠细节纠正、材质精修与组件补全，不新增独立单品。

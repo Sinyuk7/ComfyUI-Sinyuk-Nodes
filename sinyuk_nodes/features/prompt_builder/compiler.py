@@ -1,4 +1,4 @@
-"""Pure Python compiler for GarmentAnalysis JSON."""
+"""Preset-backed prompt context loading and prompt compilation."""
 
 from __future__ import annotations
 
@@ -8,7 +8,11 @@ from importlib.resources import files
 from string import Template
 from typing import TypedDict, TypeGuard
 
-from sinyuk_nodes.features.llm.schema import JSONSchemaDocument, parse_json_schema
+from sinyuk_nodes.features.llm.schema import (
+    JSONSchemaDocument,
+    parse_json_schema,
+    validate_json,
+)
 
 
 class _KeyDetail(TypedDict):
@@ -40,12 +44,35 @@ class _Analysis(TypedDict):
 
 
 @dataclass(frozen=True)
-class GarmentAnalysisContext:
-    """Static prompts and schema for one Garment Analysis protocol."""
+class LoadedPromptContext:
+    """Loaded prompts and schema for one prompt preset."""
 
+    preset_id: str
+    version: int
+    compiler_id: str
     system_prompt: str
     user_prompt: str
-    schema: JSONSchemaDocument
+    schema: JSONSchemaDocument | None
+    example: str | None
+    template: str | None
+
+
+@dataclass(frozen=True)
+class PromptContext:
+    """Preset contract passed from a context node to a prompt builder."""
+
+    preset_id: str
+    version: int
+    schema: JSONSchemaDocument | None
+    example: str | None
+    compiler_id: str
+    template: str | None
+
+
+_PRESET_PATHS = {
+    "garment.replacement": "garment/replacement",
+    "garment.enhancement": "garment/enhancement",
+}
 
 
 def _is_object_list(value: object) -> TypeGuard[list[object]]:
@@ -58,28 +85,122 @@ def _is_object_dict(value: object) -> TypeGuard[dict[object, object]]:
 
 def _asset(name: str, preset: str) -> str:
     return (
-        files("sinyuk_nodes.features.garment_prompt_compiler")
+        files("sinyuk_nodes.features.prompt_builder")
         .joinpath("presets", preset, name)
         .read_text(encoding="utf-8")
     )
 
 
-def load_garment_analysis_schema(preset: str = "replacement") -> JSONSchemaDocument:
-    """Load the bundled schema used by the upstream GarmentAnalysis LLM."""
+def _optional_asset(name: str, preset: str) -> str | None:
+    try:
+        return _asset(name, preset)
+    except FileNotFoundError:
+        return None
 
-    if preset not in {"replacement", "enhancement"}:
-        raise ValueError(f"Unsupported garment analysis preset: {preset}.")
-    return parse_json_schema(_asset("schema.json", preset), f"garment_{preset}")
+
+def _normalize_preset_id(preset: str) -> str:
+    normalized = preset.strip().lower()
+    aliases = {
+        "replacement": "garment.replacement",
+        "enhancement": "garment.enhancement",
+    }
+    return aliases.get(normalized, normalized)
 
 
-def load_garment_analysis_context(preset: str = "replacement") -> GarmentAnalysisContext:
-    """Load the complete static Garment Analysis protocol."""
+def _preset_path(preset_id: str) -> str:
+    try:
+        return _PRESET_PATHS[preset_id]
+    except KeyError as exc:
+        raise ValueError(f"Unsupported prompt preset: {preset_id}.") from exc
 
-    schema = load_garment_analysis_schema(preset)
-    return GarmentAnalysisContext(
-        system_prompt=_asset("templates/system_prompt.txt", preset).strip(),
-        user_prompt=_asset("templates/user_prompt.txt", preset).strip(),
-        schema=schema,
+
+def _load_manifest(preset_id: str, preset_path: str) -> tuple[int, str]:
+    raw = _optional_asset("manifest.json", preset_path)
+    if raw is None:
+        raise ValueError(f"Preset {preset_id} is missing manifest.json.")
+    try:
+        value: object = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Invalid manifest.json for preset {preset_id}.") from exc
+    if not isinstance(value, dict):
+        raise ValueError(f"Invalid manifest.json for preset {preset_id}: expected an object.")
+    manifest_id = value.get("id")
+    if manifest_id != preset_id:
+        raise ValueError(f"Invalid manifest.json for preset {preset_id}: id must match the preset.")
+    version = value.get("version", 1)
+    compiler = value.get("compiler", value.get("compiler_id", "template"))
+    if not isinstance(version, int) or isinstance(version, bool) or version < 1:
+        raise ValueError(f"Invalid manifest.json for preset {preset_id}: version must be positive.")
+    if not isinstance(compiler, str) or not compiler.strip():
+        raise ValueError(f"Invalid manifest.json for preset {preset_id}: compiler is required.")
+    return version, compiler.strip()
+
+
+def load_preset_schema(preset: str = "garment.replacement") -> JSONSchemaDocument:
+    """Load the JSON contract bundled with one prompt preset."""
+
+    preset_id = _normalize_preset_id(preset)
+    preset_path = _preset_path(preset_id)
+    return parse_json_schema(_asset("schema.json", preset_path), preset_id.replace(".", "_"))
+
+
+def load_prompt_context(
+    preset: str = "garment.replacement",
+    schema_placement: str = "External",
+    extra_prompt: str = "",
+) -> LoadedPromptContext:
+    """Load one preset contract and compose its LLM-facing prompts."""
+
+    preset_id = _normalize_preset_id(preset)
+    preset_path = _preset_path(preset_id)
+    version, compiler_id = _load_manifest(preset_id, preset_path)
+    try:
+        schema = load_preset_schema(preset_id)
+    except FileNotFoundError:
+        schema = None
+    system_prompt = _asset("system.txt", preset_path).strip()
+    user_prompt = _asset("user.txt", preset_path).strip()
+    example = _optional_asset("example.json", preset_path)
+    if example is not None:
+        try:
+            example_value: object = json.loads(example)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"Invalid example.json for preset {preset_id}.") from exc
+        if schema is not None:
+            validate_json(example_value, schema)
+        example = json.dumps(example_value, ensure_ascii=False, indent=2)
+    if schema_placement == "In Prompt":
+        schema_text = (
+            json.dumps(schema.schema, ensure_ascii=False, indent=2) if schema is not None else ""
+        )
+        prompt_parts = [
+            "Return only valid JSON matching the following JSON Schema.",
+            "Do not include Markdown fences or additional text.",
+        ]
+        if schema_text:
+            prompt_parts.append(schema_text)
+        if example is not None:
+            prompt_parts.append(f"Example output:\n{example}")
+        system_prompt = "\n\n".join(
+            part for part in (system_prompt, "\n".join(prompt_parts)) if part
+        )
+    elif schema_placement != "External":
+        raise ValueError(f"Unsupported schema placement: {schema_placement}.")
+    extra = extra_prompt.strip()
+    if extra:
+        user_prompt = "\n\n".join(
+            part for part in (user_prompt, f"Additional instructions:\n{extra}") if part
+        )
+    template = _optional_asset("template.txt", preset_path)
+    return LoadedPromptContext(
+        preset_id,
+        version,
+        compiler_id,
+        system_prompt,
+        user_prompt,
+        schema,
+        example,
+        template,
     )
 
 
@@ -271,7 +392,7 @@ def _render_item(index: int, garment: _Garment, preset: str) -> str:
         "presentation": garment["presentation"],
     }
     template = _asset("templates/outfit_item.txt", preset)
-    if preset == "enhancement":
+    if preset.rsplit("/", maxsplit=1)[-1] == "enhancement":
         values["key_details"] = "\n".join(detail_lines)
         # Each optional section belongs to one field in the bundled item template.
         template = "\n\n".join(
@@ -286,36 +407,72 @@ def _render_item(index: int, garment: _Garment, preset: str) -> str:
 
 
 def compile_prompt(
-    analysis_json: str, extra_prompt: str = "", *, schema: JSONSchemaDocument
+    analysis_json: str,
+    *,
+    schema: JSONSchemaDocument,
+    preset: str | None = None,
+    template: str | None = None,
 ) -> str:
     """Compile one validated GarmentAnalysis JSON document into a prompt."""
 
-    preset = {
+    preset = preset or {
         "garment_replacement": "replacement",
         "garment_enhancement": "enhancement",
     }.get(schema.name)
     if preset is None:
         raise ValueError(f"Unsupported garment prompt schema: {schema.name}.")
-    if schema.schema != load_garment_analysis_schema(preset).schema:
+    if schema.schema != load_preset_schema(f"garment.{preset}").schema:
         raise ValueError("Analysis Schema does not match the bundled preset.")
+    preset_path = f"garment/{preset}"
     analysis = _parse_analysis(analysis_json, allow_empty_garments=preset == "enhancement")
     item_blocks: list[str] = []
     for index, garment in enumerate(analysis["garments"], start=1):
-        item_blocks.append(_render_item(index, garment, preset))
+        item_blocks.append(_render_item(index, garment, preset_path))
     return (
-        Template(_asset(f"templates/garment_{preset}.txt", preset))
+        Template(template or _asset("template.txt", f"garment/{preset}"))
         .safe_substitute(
             outfit_items="\n\n".join(item_blocks),
             subject_context=_render_subject(analysis["subject"]),
-            extra_prompt=extra_prompt.strip(),
         )
         .strip()
     )
 
 
+def build_prompt(llm_response: str, *, context: PromptContext) -> str:
+    """Build a prompt from a preset context and a structured LLM response."""
+
+    if context.schema is None:
+        raise ValueError("Prompt Builder requires the preset JSON Schema.")
+    if context.compiler_id == "garment" and context.template is None:
+        raise ValueError("Prompt Builder requires the preset Prompt template.")
+    try:
+        value: object = json.loads(llm_response)
+    except json.JSONDecodeError as exc:
+        raise ValueError("Prompt Builder received malformed JSON from the LLM.") from exc
+    validate_json(value, context.schema)
+    if context.compiler_id == "garment":
+        return compile_prompt(
+            json.dumps(value, ensure_ascii=False),
+            schema=context.schema,
+            preset=context.preset_id.rsplit(".", maxsplit=1)[-1],
+            template=context.template,
+        )
+    if context.compiler_id == "template":
+        if context.template is None:
+            raise ValueError("Prompt Builder requires a template for the template compiler.")
+        rendered = Template(context.template).safe_substitute(
+            json=json.dumps(value, ensure_ascii=False, indent=2),
+            response=llm_response,
+        )
+        return rendered.strip()
+    raise ValueError(f"Unsupported prompt compiler: {context.compiler_id}.")
+
+
 __all__ = [
-    "GarmentAnalysisContext",
+    "LoadedPromptContext",
+    "PromptContext",
+    "build_prompt",
     "compile_prompt",
-    "load_garment_analysis_context",
-    "load_garment_analysis_schema",
+    "load_preset_schema",
+    "load_prompt_context",
 ]

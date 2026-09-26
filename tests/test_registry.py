@@ -7,14 +7,11 @@ import importlib.util
 from pathlib import Path
 
 from sinyuk_nodes.extension import SinyukNodesExtension, comfy_entrypoint
-from sinyuk_nodes.nodes.garment_prompt_compiler import (
-    GarmentAnalysisContextNode,
-    GarmentPromptCompiler,
-)
 from sinyuk_nodes.nodes.image_api.batch import BatchImageGenerate, ImageAPILoadImagesFromFolder
 from sinyuk_nodes.nodes.image_api.config import ImageAPIConfig
 from sinyuk_nodes.nodes.image_api.generate import ImageGenerate
 from sinyuk_nodes.nodes.llm.chat import LLMAPINode
+from sinyuk_nodes.nodes.prompt_builder import PromptBuilderNode, PromptContextNode
 from sinyuk_nodes.registry import ALL_NODES, get_node_list
 
 
@@ -23,8 +20,8 @@ def test_registry_is_explicit() -> None:
         "AspectRatioResolutionNode",
         "OpenAPIConfigNode",
         "JSONSchemaNode",
-        "GarmentAnalysisContextNode",
-        "GarmentPromptCompiler",
+        "PromptContextNode",
+        "PromptBuilderNode",
         "LLMAPINode",
         "ImageAPIConfig",
         "ImageGenerate",
@@ -54,15 +51,15 @@ def test_root_entrypoint_is_discoverable() -> None:
     assert callable(module.comfy_entrypoint)
 
 
-def test_garment_analysis_context_node_returns_protocol_outputs() -> None:
-    schema = GarmentAnalysisContextNode.define_schema()
+def test_prompt_context_node_returns_protocol_outputs() -> None:
+    schema = PromptContextNode.define_schema()
     schema.validate()
-    output = GarmentAnalysisContextNode.execute()
+    output = PromptContextNode.execute()
 
-    assert len(output.result) == 3
+    assert len(output.result) == 4
     assert output.result[0]
     assert output.result[1]
-    assert output.result[0].name == "garment_replacement"
+    assert output.result[2].name == "garment_replacement"
 
 
 def test_llm_api_schema_groups_prompts_before_structured_output_options() -> None:
@@ -96,9 +93,9 @@ def test_image_api_nodes_use_the_module_namespace() -> None:
 def test_enhancement_context_connects_to_builder() -> None:
     import json
 
-    output = GarmentAnalysisContextNode.execute("Enhancement")
-    schema = output.result[0]
-    GarmentPromptCompiler.define_schema().validate()
+    output = PromptContextNode.execute("Enhancement")
+    prompt_context = output.result[3]
+    PromptBuilderNode.define_schema().validate()
     analysis = json.dumps(
         {
             "schema_version": "2.0",
@@ -121,5 +118,5 @@ def test_enhancement_context_connects_to_builder() -> None:
             ],
         }
     )
-    result = GarmentPromptCompiler.execute(analysis_json=analysis, schema=schema)
+    result = PromptBuilderNode.execute(llm_response=analysis, prompt_context=prompt_context)
     assert result.result[0].startswith("Refine the existing outfit")

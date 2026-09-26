@@ -8,16 +8,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TypeGuard
 
+from jsonschema import Draft202012Validator
+from jsonschema.exceptions import SchemaError, ValidationError
+
 _NAME_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
-_JSON_TYPES = {"array", "boolean", "integer", "null", "number", "object", "string"}
 
 
 def _is_object(value: object) -> TypeGuard[dict[str, object]]:
     return isinstance(value, dict)
-
-
-def _is_list(value: object) -> TypeGuard[list[object]]:
-    return isinstance(value, list)
 
 
 @dataclass(frozen=True)
@@ -26,45 +24,6 @@ class JSONSchemaDocument:
 
     name: str
     schema: dict[str, object]
-
-
-def _validate_schema_node(value: object, path: str) -> None:
-    if not _is_object(value):
-        raise ValueError(f"JSON Schema {path} must be an object.")
-    schema_type = value.get("type")
-    if schema_type is not None and not (
-        isinstance(schema_type, str)
-        and schema_type in _JSON_TYPES
-        or _is_list(schema_type)
-        and schema_type
-        and all(isinstance(item, str) and item in _JSON_TYPES for item in schema_type)
-    ):
-        raise ValueError(f"JSON Schema {path}.type must be a supported JSON type.")
-    properties = value.get("properties")
-    if properties is not None:
-        if not _is_object(properties):
-            raise ValueError(f"JSON Schema {path}.properties must be an object.")
-        if value.get("additionalProperties") is not False:
-            raise ValueError(
-                f"JSON Schema {path} must set additionalProperties to false for strict output."
-            )
-        required = value.get("required")
-        if not _is_list(required) or set(required) != set(properties):
-            raise ValueError(
-                f"JSON Schema {path}.required must contain every property exactly "
-                "for strict output."
-            )
-        for key, child in properties.items():
-            _validate_schema_node(child, f"{path}.properties.{key}")
-    items = value.get("items")
-    if items is not None:
-        _validate_schema_node(items, f"{path}.items")
-    any_of = value.get("anyOf")
-    if any_of is not None:
-        if not _is_list(any_of) or not any_of:
-            raise ValueError(f"JSON Schema {path}.anyOf must be a non-empty array.")
-        for index, child in enumerate(any_of):
-            _validate_schema_node(child, f"{path}.anyOf[{index}]")
 
 
 def parse_json_schema(raw: str, name: str = "") -> JSONSchemaDocument:
@@ -81,7 +40,10 @@ def parse_json_schema(raw: str, name: str = "") -> JSONSchemaDocument:
     resolved_name = name.strip() or "schema"
     if not _NAME_PATTERN.fullmatch(resolved_name):
         raise ValueError("Schema name must be 1-64 letters, numbers, underscores, or hyphens.")
-    _validate_schema_node(value, "root")
+    try:
+        Draft202012Validator.check_schema(value)
+    except SchemaError as exc:
+        raise ValueError("JSON Schema is invalid.") from exc
     return JSONSchemaDocument(resolved_name, value)
 
 
@@ -103,4 +65,32 @@ def load_json_schema(source: str, source_kind: str, name: str = "") -> JSONSchem
     return parse_json_schema(raw, resolved_name)
 
 
-__all__ = ["JSONSchemaDocument", "load_json_schema", "parse_json_schema"]
+def format_validation_error(error: ValidationError) -> str:
+    """Format a jsonschema error for a ComfyUI node message."""
+
+    path = "".join(
+        f"[{part}]" if isinstance(part, int) else f".{part}" for part in error.absolute_path
+    ).lstrip(".")
+    return (
+        "LLM response does not match preset schema:\n"
+        f"path: {path or '<root>'}\n"
+        f"error: {error.message}"
+    )
+
+
+def validate_json(value: object, document: JSONSchemaDocument) -> None:
+    """Validate decoded JSON with the jsonschema library."""
+
+    validator = Draft202012Validator(document.schema)
+    error = next(validator.iter_errors(value), None)
+    if error is not None:
+        raise ValueError(format_validation_error(error)) from error
+
+
+__all__ = [
+    "JSONSchemaDocument",
+    "load_json_schema",
+    "parse_json_schema",
+    "format_validation_error",
+    "validate_json",
+]
