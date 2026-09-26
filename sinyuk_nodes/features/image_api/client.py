@@ -319,7 +319,7 @@ class GrsaiClient:
                 yield self.sessions
             else:
                 api = await stack.enter_async_context(aiohttp.ClientSession())
-                cdn = await stack.enter_async_context(aiohttp.ClientSession())
+                cdn = await stack.enter_async_context(aiohttp.ClientSession(trust_env=True))
                 yield api, cdn
 
     async def _generate(self, request: Mapping[str, object]) -> list[torch.Tensor]:

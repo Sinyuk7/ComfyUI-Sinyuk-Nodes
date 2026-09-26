@@ -180,3 +180,65 @@ async def test_submit_interruption_preserves_unknown_without_retry(stop: str) ->
     finally:
         release.set()
         await runner.cleanup()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("owner", ["single", "batch"])
+async def test_cdn_download_respects_environment_proxy(owner, monkeypatch, tmp_path) -> None:
+    from io import BytesIO
+
+    from aiohttp import web
+    from PIL import Image
+    from sinyuk_nodes.features.image_api.batch_plan import BatchPlan
+    from sinyuk_nodes.features.image_api.batch_runner import BatchRunner
+    from sinyuk_nodes.features.image_api.references import ReferenceSet, Source
+
+    buffer = BytesIO()
+    Image.new("RGB", (2, 2)).save(buffer, format="PNG")
+    received = []
+
+    async def proxy(request: web.Request) -> web.Response:
+        assert "Authorization" not in request.headers
+        received.append(request.raw_path)
+        return web.Response(body=buffer.getvalue(), content_type="image/png")
+
+    app = web.Application()
+    app.router.add_route("*", "/{path:.*}", proxy)
+    server = web.AppRunner(app)
+    await server.setup()
+    try:
+        await web.TCPSite(server, "127.0.0.1", 0).start()
+        monkeypatch.setenv("http_proxy", f"http://127.0.0.1:{server.addresses[0][1]}")
+        monkeypatch.setenv("no_proxy", "")
+        monkeypatch.delenv("NO_PROXY", raising=False)
+        config = get_config()
+        url = "http://cdn.invalid/image.png"
+        if owner == "single":
+            client = GrsaiClient(config, "test-key")
+            async with client._sessions() as (_, cdn):
+                image = await client._download(cdn, url, 1)
+                assert image.shape == (1, 2, 2, 3)
+        else:
+
+            async def generate(client, request):
+                assert client.sessions is not None
+                image = await client._download(client.sessions[1], url, 1)
+                assert client.result is not None
+                await client.result(image, 1, 1)
+                return [image]
+
+            monkeypatch.setattr(GrsaiClient, "generate", generate)
+            source = Source("input.png", None, 1, "0" * 64)
+            references = ReferenceSet((torch.zeros((1, 2, 2, 3)),), (source,))
+            plan = BatchPlan((references,), ("prompt",), "prompts", 1)
+            parameters = {
+                k: v.default for k, v in config.profile(config.default_model).parameters.items()
+            }
+            batch = BatchRunner(
+                config, "test-key", plan, config.default_model, parameters, 2, "result", tmp_path
+            )
+            images, _ = await batch.run()
+            assert len(images) == 1
+        assert received == [url]
+    finally:
+        await server.cleanup()

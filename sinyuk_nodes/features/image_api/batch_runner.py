@@ -356,7 +356,7 @@ class BatchRunner:
                     break
                 await self._task(spec, sessions)
 
-        async with aiohttp.ClientSession() as api, aiohttp.ClientSession() as cdn:
+        async with aiohttp.ClientSession() as api, aiohttp.ClientSession(trust_env=True) as cdn:
             workers = [
                 asyncio.create_task(worker((api, cdn)))
                 for _ in range(min(self.concurrency, self.plan.total))
