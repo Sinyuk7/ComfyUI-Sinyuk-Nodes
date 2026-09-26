@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.11"
 license = "GPL-3.0-only"
 authors = [{ name = "Sinyuk" }]
-dependencies = ["aiohttp>=3.11.8", "httpx>=0.27"]
+dependencies = ["aiohttp>=3.11.8", "httpx>=0.27", "numpy>=1.25.0", "Pillow"]
 classifiers = [
     "Development Status :: 2 - Pre-Alpha",
     "Programming Language :: Python :: 3",
