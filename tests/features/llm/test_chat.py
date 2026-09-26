@@ -28,35 +28,28 @@ _SCHEMA = JSONSchemaDocument(
 )
 
 
-def test_manual_model_takes_priority_over_dropdown() -> None:
-    config = build_config(
-        "secret",
-        "https://example.test/v1",
-        "manual-model",
-        "listed-model",
-        ("listed-model",),
-    )
+def test_custom_model_requires_explicit_custom_selection() -> None:
+    config = build_config("secret", "https://example.test/v1", "custom", "vendor-model")
 
-    assert config.model == "manual-model"
+    assert config.model == "vendor-model"
 
 
-def test_model_selection_does_not_fall_back_to_first_cached_model() -> None:
-    config = build_config(
-        "secret", "https://example.test/v1", "", "auto", ("first-model", "second-model")
-    )
+def test_custom_model_id_is_rejected_for_preset_selection() -> None:
+    with pytest.raises(ValueError, match="only valid when model is custom"):
+        build_config("secret", "https://example.test/v1", "gpt-6-astra", "vendor-model")
 
-    with pytest.raises(ValueError, match="select a model"):
-        _ = config.model
+
+def test_custom_selection_requires_model_id() -> None:
+    with pytest.raises(ValueError, match="Enter a custom model ID"):
+        build_config("secret", "https://example.test/v1", "custom", "")
 
 
 def test_request_uses_standard_text_chat_shape() -> None:
-    config = build_config(
-        "secret", "https://example.test/v1", "", "listed-model", ("listed-model",)
-    )
+    config = build_config("secret", "https://example.test/v1", "gpt-6-astra", "")
 
     payload = build_payload(config, "Be concise.", "Describe this.", (), 0.7, 1.0, 128, "text", "")
 
-    assert payload["model"] == "listed-model"
+    assert payload["model"] == "gpt-6-astra"
     assert payload["messages"] == [
         {"role": "system", "content": "Be concise."},
         {"role": "user", "content": "Describe this."},
@@ -65,9 +58,7 @@ def test_request_uses_standard_text_chat_shape() -> None:
 
 
 def test_unset_sampling_parameters_are_omitted() -> None:
-    config = build_config(
-        "secret", "https://example.test/v1", "", "listed-model", ("listed-model",)
-    )
+    config = build_config("secret", "https://example.test/v1", "gpt-6-astra", "")
 
     payload = build_payload(
         config,
@@ -85,9 +76,7 @@ def test_unset_sampling_parameters_are_omitted() -> None:
 
 
 def test_image_detail_is_sent_to_each_image() -> None:
-    config = build_config(
-        "secret", "https://example.test/v1", "", "listed-model", ("listed-model",)
-    )
+    config = build_config("secret", "https://example.test/v1", "gpt-6-astra", "")
     image = EncodedImage(
         encoded_bytes=b"abc",
         base64_data_url="data:image/jpeg;base64,abc",
@@ -120,9 +109,7 @@ def test_refusal_is_reported_separately_from_malformed_content() -> None:
 
 
 def test_chat_json_schema_is_sent_as_response_format() -> None:
-    config = build_config(
-        "secret", "https://example.test/v1", "", "listed-model", ("listed-model",)
-    )
+    config = build_config("secret", "https://example.test/v1", "gpt-6-astra", "")
     payload = build_payload(
         config, "", "Reply.", (), response_format="json_schema", json_schema=_SCHEMA
     )
@@ -133,9 +120,7 @@ def test_chat_json_schema_is_sent_as_response_format() -> None:
 
 
 def test_responses_json_schema_is_sent_as_text_format() -> None:
-    config = build_config(
-        "secret", "https://example.test/v1", "", "listed-model", ("listed-model",)
-    )
+    config = build_config("secret", "https://example.test/v1", "gpt-6-astra", "")
     payload = build_responses_payload(
         config, "System.", "Reply.", (), response_format="json_schema", json_schema=_SCHEMA
     )
@@ -150,9 +135,7 @@ def test_responses_json_schema_is_sent_as_text_format() -> None:
 
 
 def test_json_object_format_is_supported_by_both_apis() -> None:
-    config = build_config(
-        "secret", "https://example.test/v1", "", "listed-model", ("listed-model",)
-    )
+    config = build_config("secret", "https://example.test/v1", "gpt-6-astra", "")
 
     assert build_payload(config, "", "Reply.", (), response_format="json_object")[
         "response_format"
@@ -163,9 +146,7 @@ def test_json_object_format_is_supported_by_both_apis() -> None:
 
 
 def test_reasoning_effort_none_is_omitted_and_other_values_are_api_specific() -> None:
-    config = build_config(
-        "secret", "https://example.test/v1", "", "listed-model", ("listed-model",)
-    )
+    config = build_config("secret", "https://example.test/v1", "gpt-6-astra", "")
 
     chat_default = build_payload(config, "", "Reply.", ())
     responses_default = build_responses_payload(config, "", "Reply.", ())
@@ -188,9 +169,7 @@ def test_responses_text_extracts_output_text() -> None:
 
 
 def test_responses_payload_keeps_every_image_input() -> None:
-    config = build_config(
-        "secret", "https://example.test/v1", "", "listed-model", ("listed-model",)
-    )
+    config = build_config("secret", "https://example.test/v1", "gpt-6-astra", "")
     images = tuple(
         EncodedImage(
             encoded_bytes=b"abc",
@@ -230,22 +209,18 @@ def test_schema_validation_requires_strict_object_properties() -> None:
 
 
 def test_json_schema_requires_connection_for_structured_output() -> None:
-    config = build_config(
-        "secret", "https://example.test/v1", "", "listed-model", ("listed-model",)
-    )
+    config = build_config("secret", "https://example.test/v1", "gpt-6-astra", "")
     with pytest.raises(ValueError, match="Connect a JSON Schema"):
         build_payload(config, "", "Reply.", (), response_format="json_schema")
 
 
 def test_execution_summary_is_markdown() -> None:
-    config = build_config(
-        "secret", "https://example.test/v1", "", "listed-model", ("listed-model",)
-    )
+    config = build_config("secret", "https://example.test/v1", "gpt-6-astra", "")
     summary = _execution_summary(config, "json_schema", _SCHEMA, 4, "high", 2048, "miss", 123, "{}")
     assert summary == (
         "### Execution Summary\n\n"
         "- **API:** `resp`\n"
-        "- **Model:** `listed-model`\n"
+        "- **Model:** `gpt-6-astra`\n"
         "- **Response format:** `JSON Schema`\n"
         "- **JSON Schema:** `status_result`\n"
         "- **Images:** `4` (`high` detail)\n"

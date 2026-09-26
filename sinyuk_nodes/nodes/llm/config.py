@@ -5,13 +5,8 @@
 
 from __future__ import annotations
 
-from sinyuk_nodes.compat.comfy import ComfyAPI, check_interrupt, io
-from sinyuk_nodes.features.llm.client import (
-    OpenAPIRequestError,
-    available_models,
-    fetch_models,
-)
-from sinyuk_nodes.features.llm.config import build_config
+from sinyuk_nodes.compat.comfy import check_interrupt, io
+from sinyuk_nodes.features.llm.config import OPENAPI_MODELS, build_config
 
 OPENAPI_CONFIG = io.Custom("OPENAPI_CONFIG")
 
@@ -34,12 +29,26 @@ class OpenAPIConfigNode(io.ComfyNode):
                     display_name="Provider",
                     tooltip="OpenAI-compatible API provider.",
                 ),
+                io.String.Input(
+                    "base_url",
+                    default="https://api.openai.com/v1",
+                    display_name="Base URL",
+                    socketless=True,
+                    tooltip="HTTP(S) base URL for the OpenAI-compatible API.",
+                ),
                 io.Combo.Input(
-                    "api_mode",
-                    options=["Responses API", "Chat Completions"],
-                    default="Responses API",
-                    display_name="API Mode",
-                    tooltip="Responses API is recommended for new integrations.",
+                    "model_selection",
+                    options=list(OPENAPI_MODELS),
+                    default=OPENAPI_MODELS[0],
+                    display_name="Model",
+                    tooltip="Select a preset model or choose custom.",
+                ),
+                io.String.Input(
+                    "custom_model_id",
+                    default="",
+                    display_name="Custom Model ID",
+                    socketless=True,
+                    tooltip="Required only when Model is set to custom.",
                 ),
                 io.String.Input(
                     "api_key",
@@ -48,30 +57,12 @@ class OpenAPIConfigNode(io.ComfyNode):
                     socketless=True,
                     tooltip="API key sent to the configured endpoint.",
                 ),
-                io.String.Input(
-                    "base_url",
-                    default="https://api.openai.com/v1",
-                    display_name="Base URL",
-                    socketless=True,
-                    tooltip="HTTP(S) base URL for the OpenAI-compatible API.",
-                ),
-                io.String.Input(
-                    "model_input",
-                    default="",
-                    display_name="Model ID",
-                    socketless=True,
-                    tooltip="Optional model ID. This value takes priority over the model dropdown.",
-                ),
                 io.Combo.Input(
-                    "model_selection",
-                    options=["auto"],
-                    default="auto",
-                    display_name="Model",
-                    tooltip="Select a cached model. The list is synchronized by the backend.",
-                    remote=io.RemoteOptions(
-                        route="/sinyuk/openapi/models",
-                        refresh_button=False,
-                    ),
+                    "api_mode",
+                    options=["Responses API", "Chat Completions"],
+                    default="Responses API",
+                    display_name="API Mode",
+                    tooltip="Responses API is recommended for new integrations.",
                 ),
             ],
             outputs=[
@@ -91,42 +82,15 @@ class OpenAPIConfigNode(io.ComfyNode):
         api_mode: str,
         api_key: str,
         base_url: str,
-        model_input: str,
         model_selection: str,
+        custom_model_id: str,
     ) -> io.NodeOutput:
         check_interrupt()
         if provider != "openapi":
             raise ValueError("Only the openapi provider is supported.")
         api_modes = {"Responses API": "responses", "Chat Completions": "chat_completions"}
         normalized_mode = api_modes.get(api_mode, api_mode)
-        config = build_config(api_key, base_url, model_input, model_selection, (), normalized_mode)
-
-        # A manually entered model is authoritative.  Do not probe ``/models``
-        # in that case: OpenAI-compatible relay services commonly implement
-        # completions but intentionally omit the catalog endpoint.
-        if config.model_input.strip():
-            return io.NodeOutput(config)
-
-        models = available_models(config.base_url)
-        if models:
-            config = build_config(
-                api_key, base_url, model_input, model_selection, models, normalized_mode
-            )
-        models = config.available_models
-        if not models:
-            check_interrupt()
-            await ComfyAPI().execution.set_progress(0, 1, node_id=str(cls.hidden.unique_id))
-            try:
-                models = await fetch_models(config.base_url, config.api_key)
-            except OpenAPIRequestError:
-                if not config.model_input.strip():
-                    raise
-                models = ()
-            await ComfyAPI().execution.set_progress(1, 1, node_id=str(cls.hidden.unique_id))
-            check_interrupt()
-            config = build_config(
-                api_key, base_url, model_input, model_selection, models, normalized_mode
-            )
+        config = build_config(api_key, base_url, model_selection, custom_model_id, normalized_mode)
         return io.NodeOutput(config)
 
 
