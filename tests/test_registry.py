@@ -62,7 +62,7 @@ def test_garment_analysis_context_node_returns_protocol_outputs() -> None:
     assert len(output.result) == 3
     assert output.result[0]
     assert output.result[1]
-    assert output.result[2].name == "garment_replacement"
+    assert output.result[0].name == "garment_replacement"
 
 
 def test_llm_api_schema_groups_prompts_before_structured_output_options() -> None:
@@ -97,7 +97,7 @@ def test_enhancement_context_connects_to_builder() -> None:
     import json
 
     output = GarmentAnalysisContextNode.execute("Enhancement")
-    schema = output.result[2]
+    schema = output.result[0]
     GarmentPromptCompiler.define_schema().validate()
     analysis = json.dumps(
         {

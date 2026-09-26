@@ -38,9 +38,9 @@ class GarmentAnalysisContextNode(io.ComfyNode):
                 )
             ],
             outputs=[
-                io.String.Output("system_prompt", display_name="System Prompt"),
-                io.String.Output("user_prompt", display_name="User Prompt"),
                 JSON_SCHEMA.Output("schema", display_name="JSON Schema"),
+                io.String.Output("user_prompt", display_name="User Prompt"),
+                io.String.Output("system_prompt", display_name="System Prompt"),
             ],
         )
 
@@ -48,7 +48,7 @@ class GarmentAnalysisContextNode(io.ComfyNode):
     def execute(cls, preset: str = "Replacement") -> io.NodeOutput:
         preset_id = preset.lower()
         context = load_garment_analysis_context(preset_id)
-        return io.NodeOutput(context.system_prompt, context.user_prompt, context.schema)
+        return io.NodeOutput(context.schema, context.user_prompt, context.system_prompt)
 
 
 class GarmentPromptCompiler(io.ComfyNode):
