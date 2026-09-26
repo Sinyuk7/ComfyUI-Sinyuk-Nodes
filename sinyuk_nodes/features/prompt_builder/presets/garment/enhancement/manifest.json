@@ -1,1 +1,7 @@
-{"id":"garment.enhancement","version":1,"display_name":"Garment Enhancement","compiler":"garment"}
+{
+  "id": "garment.enhancement",
+  "version": 1,
+  "display_name": "Garment Enhancement",
+  "desc": "Analyze reference images and refine the subject's existing garments.",
+  "compiler": "garment"
+}

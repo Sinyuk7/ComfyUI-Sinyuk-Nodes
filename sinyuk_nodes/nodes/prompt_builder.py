@@ -13,6 +13,7 @@ from sinyuk_nodes.features.prompt_builder import (
     available_presets,
     build_prompt,
     load_prompt_context,
+    preset_tooltip,
 )
 
 from .llm.schema import JSON_SCHEMA
@@ -39,12 +40,17 @@ class PromptContextNode(io.ComfyNode):
                     options=available_presets(),
                     default="garment.replacement",
                     display_name="Preset",
+                    tooltip=preset_tooltip(),
                 ),
                 io.Combo.Input(
                     "schema_placement",
                     options=["External", "In Prompt"],
                     default="External",
                     display_name="Schema Placement",
+                    tooltip=(
+                        "External keeps the schema as a separate output. "
+                        "In Prompt appends it to the System Prompt."
+                    ),
                 ),
                 io.String.Input(
                     "extra_prompt",
@@ -56,10 +62,24 @@ class PromptContextNode(io.ComfyNode):
                 ),
             ],
             outputs=[
-                io.String.Output("system_prompt", display_name="System Prompt"),
-                io.String.Output("user_prompt", display_name="User Prompt"),
-                JSON_SCHEMA.Output("schema", display_name="JSON Schema"),
-                PROMPT_CONTEXT.Output("prompt_context", display_name="Prompt Context"),
+                io.String.Output(
+                    "system_prompt",
+                    display_name="System Prompt",
+                    tooltip="Preset system prompt for the upstream LLM node.",
+                ),
+                io.String.Output(
+                    "user_prompt",
+                    display_name="User Prompt",
+                    tooltip="Preset user prompt with optional extra instructions.",
+                ),
+                JSON_SCHEMA.Output(
+                    "schema", display_name="JSON Schema", tooltip="Optional preset JSON contract."
+                ),
+                PROMPT_CONTEXT.Output(
+                    "prompt_context",
+                    display_name="Prompt Context",
+                    tooltip="Preset contract consumed by Prompt Builder.",
+                ),
             ],
         )
 
@@ -98,16 +118,17 @@ class PromptBuilderNode(io.ComfyNode):
             category="Sinyuk/Prompt",
             description=("Build a final prompt from a preset context and an LLM response."),
             inputs=[
-                PROMPT_CONTEXT.Input(
-                    "prompt_context",
-                    display_name="Prompt Context",
-                    tooltip="Connect the matching Prompt Context preset.",
-                ),
                 io.String.Input(
                     "llm_response",
                     display_name="LLM Response",
                     multiline=True,
-                    tooltip="Structured JSON response produced by any upstream LLM node.",
+                    force_input=True,
+                    tooltip="JSON text returned by an upstream LLM node.",
+                ),
+                PROMPT_CONTEXT.Input(
+                    "prompt_context",
+                    display_name="Prompt Context",
+                    tooltip="Connect the matching Prompt Context preset.",
                 ),
             ],
             outputs=[io.String.Output("prompt", display_name="Prompt")],

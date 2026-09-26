@@ -120,3 +120,9 @@ def test_enhancement_context_connects_to_builder() -> None:
     )
     result = PromptBuilderNode.execute(llm_response=analysis, prompt_context=prompt_context)
     assert result.result[0].startswith("Refine the existing outfit")
+
+
+def test_prompt_builder_requires_llm_response_string_connection() -> None:
+    inputs = PromptBuilderNode.define_schema().inputs
+    assert [input.id for input in inputs] == ["llm_response", "prompt_context"]
+    assert inputs[0].force_input is True

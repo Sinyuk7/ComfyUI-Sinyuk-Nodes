@@ -10,6 +10,7 @@ from .compiler import (
     compile_prompt,
     load_preset_schema,
     load_prompt_context,
+    preset_tooltip,
 )
 
 __all__ = [
@@ -20,4 +21,5 @@ __all__ = [
     "compile_prompt",
     "load_preset_schema",
     "load_prompt_context",
+    "preset_tooltip",
 ]

@@ -70,7 +70,10 @@ def build_config(
     if model_selection == "custom" and not custom_model_id.strip():
         raise ValueError("Enter a custom model ID.")
     if model_selection != "custom" and custom_model_id.strip():
-        raise ValueError("Custom model ID is only valid when model is custom.")
+        raise ValueError(
+            f"Custom Model ID is filled in, but Model is set to '{model_selection}'. "
+            "Choose 'custom' in Model to use it, or clear Custom Model ID."
+        )
     return OpenAPIConfig(
         api_key=api_key.strip(),
         base_url=normalize_base_url(base_url),

@@ -1,5 +1,1 @@
-{
-  "id": "face.swap",
-  "version": 1,
-  "compiler": "template"
-}
+{"id":"face.swap","version":1,"desc":"分析参考图像并生成换脸指令。","compiler":"template"}

@@ -161,11 +161,11 @@ def build_payload(
         "model": config.model,
         "messages": messages,
     }
-    if temperature is not None:
+    if temperature is not None and temperature >= 0:
         payload["temperature"] = temperature
-    if top_p is not None:
+    if top_p is not None and top_p > 0:
         payload["top_p"] = top_p
-    if max_tokens is not None:
+    if max_tokens is not None and max_tokens > 0:
         payload["max_tokens"] = max_tokens
     if reasoning_effort != "none":
         payload["reasoning_effort"] = reasoning_effort
@@ -221,11 +221,11 @@ def build_responses_payload(
         input_items.append({"role": "system", "content": system_prompt})
     input_items.append({"role": "user", "content": content})
     payload: dict[str, object] = {"model": config.model, "input": input_items}
-    if temperature is not None:
+    if temperature is not None and temperature >= 0:
         payload["temperature"] = temperature
-    if top_p is not None:
+    if top_p is not None and top_p > 0:
         payload["top_p"] = top_p
-    if max_tokens is not None:
+    if max_tokens is not None and max_tokens > 0:
         payload["max_output_tokens"] = max_tokens
     if reasoning_effort != "none":
         payload["reasoning"] = {"effort": reasoning_effort}

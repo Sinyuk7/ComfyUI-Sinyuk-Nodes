@@ -92,8 +92,8 @@ def _optional_asset(name: str, preset: str) -> str | None:
         return None
 
 
-def _discover_preset_paths() -> dict[str, str]:
-    """Discover preset IDs and resource paths from bundled manifests."""
+def _discover_preset_metadata() -> dict[str, tuple[str, str]]:
+    """Discover preset IDs, descriptions, and resource paths from manifests."""
 
     root = files("sinyuk_nodes.features.prompt_builder").joinpath("presets")
     discovered: dict[str, str] = {}
@@ -118,14 +118,33 @@ def _discover_preset_paths() -> dict[str, str]:
             preset_id = value["id"]
             if preset_id in discovered:
                 raise ValueError(f"Duplicate prompt preset id: {preset_id}.")
-            discovered[preset_id] = f"{category.name}/{preset.name}"
+            description = value.get("desc", "")
+            if not isinstance(description, str):
+                message = f"Invalid manifest.json for preset {preset_id}: desc must be text."
+                raise ValueError(message)
+            discovered[preset_id] = (f"{category.name}/{preset.name}", description.strip())
     return discovered
+
+
+def _discover_preset_paths() -> dict[str, str]:
+    return {preset_id: metadata[0] for preset_id, metadata in _discover_preset_metadata().items()}
 
 
 def available_presets() -> list[str]:
     """Return bundled prompt preset IDs in stable display order."""
 
     return sorted(_discover_preset_paths())
+
+
+def preset_tooltip() -> str:
+    """Return a tooltip describing every discovered preset."""
+
+    metadata = _discover_preset_metadata()
+    lines = ["Select the prompt preset to load:"]
+    for preset_id in sorted(metadata):
+        description = metadata[preset_id][1]
+        lines.append(f"- {preset_id}: {description}" if description else f"- {preset_id}")
+    return "\n".join(lines)
 
 
 def _normalize_preset_id(preset: str) -> str:
@@ -503,6 +522,7 @@ __all__ = [
     "PromptContext",
     "build_prompt",
     "available_presets",
+    "preset_tooltip",
     "compile_prompt",
     "load_preset_schema",
     "load_prompt_context",

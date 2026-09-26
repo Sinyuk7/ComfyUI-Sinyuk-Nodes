@@ -48,7 +48,10 @@ class OpenAPIConfigNode(io.ComfyNode):
                     default="",
                     display_name="Custom Model ID",
                     socketless=True,
-                    tooltip="Required only when Model is set to custom.",
+                    tooltip=(
+                        "Use this for provider-specific IDs such as qwen3.8-flash. "
+                        "Set Model to custom first; otherwise leave this empty."
+                    ),
                 ),
                 io.String.Input(
                     "api_key",

@@ -35,7 +35,7 @@ def test_custom_model_requires_explicit_custom_selection() -> None:
 
 
 def test_custom_model_id_is_rejected_for_preset_selection() -> None:
-    with pytest.raises(ValueError, match="only valid when model is custom"):
+    with pytest.raises(ValueError, match="Choose 'custom'.*clear Custom Model ID"):
         build_config("secret", "https://example.test/v1", "gpt-6-astra", "vendor-model")
 
 
@@ -73,6 +73,14 @@ def test_unset_sampling_parameters_are_omitted() -> None:
     assert "temperature" not in payload
     assert "top_p" not in payload
     assert "max_tokens" not in payload
+
+
+def test_zero_top_p_is_omitted_for_compatible_api_defaults() -> None:
+    config = build_config("secret", "https://example.test/v1", "gpt-6-astra", "")
+
+    payload = build_payload(config, "", "Describe this.", (), top_p=0.0)
+
+    assert "top_p" not in payload
 
 
 def test_image_detail_is_sent_to_each_image() -> None:

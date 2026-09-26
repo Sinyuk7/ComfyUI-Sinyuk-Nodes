@@ -1,1 +1,7 @@
-{"id":"garment.replacement","version":1,"display_name":"Garment Replacement","compiler":"garment"}
+{
+  "id": "garment.replacement",
+  "version": 1,
+  "display_name": "Garment Replacement",
+  "desc": "Analyze reference images and compile a complete garment replacement prompt.",
+  "compiler": "garment"
+}

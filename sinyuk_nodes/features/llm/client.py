@@ -84,6 +84,23 @@ async def _complete(
             state.check()
             submission = "unknown"
             logger.info("llm.submit run_id=%s phase=submitting attempt=1", run_id)
+            input_value = payload.get("input", payload.get("messages"))
+            input_count = len(input_value) if isinstance(input_value, list) else 0
+            generation_fields = {
+                name: payload[name]
+                for name in ("temperature", "top_p", "max_output_tokens", "max_tokens", "reasoning")
+                if name in payload
+            }
+            logger.info(
+                "llm.request run_id=%s method=POST path=/%s model=%s fields=%s "
+                "input_items=%s generation=%s authorization=redacted",
+                run_id,
+                path,
+                payload.get("model", ""),
+                ",".join(sorted(payload)),
+                input_count,
+                generation_fields or "omitted",
+            )
             response = await _request(
                 client,
                 "POST",
