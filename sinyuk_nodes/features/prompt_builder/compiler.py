@@ -74,6 +74,7 @@ class LoadedPromptContext:
     schema: JSONSchemaDocument | None
     example: str | None
     template: str | None
+    extra_prompt: str = ""
 
 
 @dataclass(frozen=True)
@@ -86,6 +87,7 @@ class PromptContext:
     example: str | None
     compiler_id: str
     template: str | None
+    extra_prompt: str = ""
 
 
 def _is_object_list(value: object) -> TypeGuard[list[object]]:
@@ -269,7 +271,23 @@ def load_prompt_context(
         schema,
         example,
         template,
+        extra,
     )
+
+
+def _render_template_analysis(value: object) -> str:
+    """Render optional concise analysis fields for template presets."""
+
+    if not isinstance(value, dict):
+        return ""
+    sections: list[str] = []
+    head_reference = value.get("head_reference")
+    if isinstance(head_reference, str) and head_reference.strip():
+        sections.append(f"Target head reference summary: {head_reference.strip()}")
+    integration_notes = value.get("integration_notes")
+    if isinstance(integration_notes, str) and integration_notes.strip():
+        sections.append(f"Image 1 integration notes: {integration_notes.strip()}")
+    return "\n".join(sections)
 
 
 def _require_string(value: object, path: str) -> str:
@@ -591,10 +609,12 @@ def build_prompt(llm_response: str, *, context: PromptContext) -> str:
         if context.template is None:
             raise ValueError("Prompt Builder requires a template for the template compiler.")
         rendered = Template(context.template).safe_substitute(
+            analysis=_render_template_analysis(value),
+            extra_prompt=context.extra_prompt.strip(),
             json=json.dumps(value, ensure_ascii=False, indent=2),
             response=llm_response,
         )
-        return rendered.strip()
+        return "\n\n".join(part.strip() for part in rendered.split("\n\n") if part.strip())
     raise ValueError(f"Unsupported prompt compiler: {context.compiler_id}.")
 
 

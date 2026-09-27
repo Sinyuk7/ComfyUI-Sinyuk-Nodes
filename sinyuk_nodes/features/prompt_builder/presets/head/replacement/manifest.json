@@ -1,0 +1,7 @@
+{
+  "id": "head.replacement",
+  "version": 1,
+  "display_name": "Head Replacement",
+  "desc": "Summarize target head references and compile a whole-head replacement prompt.",
+  "compiler": "template"
+}

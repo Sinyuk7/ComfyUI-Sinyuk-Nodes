@@ -98,6 +98,7 @@ class PromptContextNode(io.ComfyNode):
             example=loaded.example,
             compiler_id=loaded.compiler_id,
             template=loaded.template,
+            extra_prompt=extra_prompt,
         )
         return io.NodeOutput(
             loaded.system_prompt,

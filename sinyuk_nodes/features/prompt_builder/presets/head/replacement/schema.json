@@ -1,0 +1,15 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["head_reference", "integration_notes"],
+  "properties": {
+    "head_reference": {
+      "type": "string",
+      "description": "Concise reliable summary of the target head appearance from Images 2 onward."
+    },
+    "integration_notes": {
+      "type": "string",
+      "description": "Unusual Image 1 scene conditions that materially affect head integration, such as wind, weather, unusual lighting, motion, occlusion, or atmospheric effects. Empty for ordinary scenes."
+    }
+  }
+}

@@ -18,9 +18,9 @@ from sinyuk_nodes.features.prompt_builder import (
 
 def test_prompt_presets_are_discovered_from_manifests() -> None:
     assert available_presets() == [
-        "face.swap",
         "garment.enhancement",
         "garment.replacement",
+        "head.replacement",
         "prompt.image_to_prompt",
     ]
 
@@ -46,6 +46,7 @@ def test_visual_prompt_context_compiles_structured_analysis() -> None:
         example=context.example,
         compiler_id=context.compiler_id,
         template=context.template,
+        extra_prompt=context.extra_prompt,
     )
 
     prompt = build_prompt(json.dumps(analysis), context=prompt_context)
@@ -297,7 +298,7 @@ def test_enhancement_allows_no_reliably_matching_reference_items() -> None:
 
 
 def test_template_preset_uses_the_generic_context_builder_chain() -> None:
-    context = load_prompt_context("face.swap")
+    context = load_prompt_context("head.replacement", extra_prompt="soft smile")
     assert context.compiler_id == "template"
     assert context.template is not None
 
@@ -308,10 +309,19 @@ def test_template_preset_uses_the_generic_context_builder_chain() -> None:
         example=context.example,
         compiler_id=context.compiler_id,
         template=context.template,
+        extra_prompt=context.extra_prompt,
     )
     prompt = build_prompt(
-        json.dumps({"instruction": "Preserve identity and match the target lighting."}),
+        json.dumps(
+            {
+                "head_reference": "Short dark hair with a side part.",
+                "integration_notes": "Strong warm backlight.",
+            }
+        ),
         context=prompt_context,
     )
 
-    assert "Preserve identity and match the target lighting." in prompt
+    assert "Replace the entire visible head" in prompt
+    assert "Short dark hair with a side part." in prompt
+    assert "Strong warm backlight." in prompt
+    assert "soft smile" in prompt
