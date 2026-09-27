@@ -164,16 +164,17 @@ class LLMAPINode(io.ComfyNode):
 
         server = PromptServer.instance
         client_id = server.client_id
+        node_id = str(cls.hidden.unique_id)
 
         async def report_progress(stage: str, value: float) -> None:
             with suppress(Exception):
                 if client_id is not None:
                     server.send_sync(
                         "llm.progress",
-                        {"node_id": str(unique_id), "stage": stage, "progress": value},
+                        {"node_id": node_id, "stage": stage, "progress": value},
                         client_id,
                     )
-                await ComfyAPI().execution.set_progress(value, 100, node_id=str(unique_id))
+                await ComfyAPI().execution.set_progress(value, 100, node_id=node_id)
 
         response_format = _RESPONSE_FORMAT_VALUES.get(response_format, response_format)
         result = await execute_chat(
