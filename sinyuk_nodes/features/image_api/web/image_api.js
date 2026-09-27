@@ -4,7 +4,9 @@ import { acceptEvent, balanceText, batchProgress, batchText, selectedParameters,
 
 let catalog;
 const states = new WeakMap();
+const llmStates = new WeakMap();
 const NODE_IDS = {
+  llm: "Sinyuk.LLMAPI",
   config: "Sinyuk.ImageAPI.Config",
   generate: "Sinyuk.ImageAPI.Generate",
   folder: "Sinyuk.ImageAPI.LoadFolder",
@@ -15,6 +17,21 @@ const widget = (node, name) => node?.widgets?.find((item) => item.name === name)
 const parameters = (node) => Object.fromEntries((node.widgets ?? [])
   .filter((item) => item.name.startsWith("model."))
   .map((item) => [item.name.slice(6), item.value]));
+
+function registerLLMProgressListener() {
+  api.addEventListener("llm.progress", ({ detail }) => {
+    const node = app.graph?.getNodeById(detail.node_id);
+    const state = llmStates.get(node);
+    if (!state) return;
+    state.status.value = detail.stage ?? "Working";
+    renderProgress(state, {
+      value: Number.isFinite(detail.progress) ? detail.progress : 0,
+      indeterminate: false,
+      text: detail.stage ?? "Working",
+    });
+    node.setDirtyCanvas(true, true);
+  });
+}
 
 function progressElement() {
   const root = document.createElement("div");
@@ -272,6 +289,7 @@ function configureProviderNode(node) {
 app.registerExtension({
   name: "image-api.providers",
   async setup() {
+    registerLLMProgressListener();
     const response = await api.fetchApi("/image-api/catalog");
     if (!response.ok) throw new Error("Image API configuration unavailable");
     catalog = await response.json();
@@ -319,6 +337,22 @@ app.registerExtension({
         list.textContent = files.map((name, i) => `${i + 1}. ${name}`).join("\n");
         node.setDirtyCanvas(true, true);
       };
+      return;
+    }
+    if (node.comfyClass === NODE_IDS.llm) {
+      const status = node.addWidget("text", "llm_status", "", () => {}, { serialize: false });
+      const progress = progressElement();
+      const progressWidget = node.addDOMWidget("llm_progress", "div", progress.root, { serialize: false });
+      progressWidget.serialize = false;
+      status.serialize = false;
+      status.disabled = true;
+      status.options.readOnly = true;
+      status.type = "hidden";
+      status.computeSize = () => [0, -4];
+      status.draw = () => {};
+      const state = { status, progress };
+      llmStates.set(node, state);
+      renderProgress(state, { value: 0, indeterminate: false, text: "Idle" });
       return;
     }
     if (node.comfyClass === NODE_IDS.config) {

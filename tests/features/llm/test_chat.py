@@ -235,6 +235,45 @@ async def test_qwen_session_cache_uses_internal_response_chain(
     assert calls[1][1] == {"x-dashscope-session-cache": "enable"}
 
 
+@pytest.mark.anyio
+async def test_chat_reports_simple_progress_stages(monkeypatch: pytest.MonkeyPatch) -> None:
+    config = build_config(
+        "secret", "https://example.test/v1", "gpt-6-astra", "", api_mode="chat_completions"
+    )
+    stages: list[tuple[str, float]] = []
+
+    async def fake_complete_chat(
+        base_url: str,
+        api_key: str,
+        payload: dict[str, object],
+        cancellation: object,
+    ) -> object:
+        return {"choices": [{"message": {"content": "OK"}}]}
+
+    async def report(stage: str, value: float) -> None:
+        stages.append((stage, value))
+
+    monkeypatch.setattr(chat_feature, "complete_chat", fake_complete_chat)
+    await chat_feature.execute_chat(
+        config,
+        "",
+        "Reply.",
+        None,
+        1,
+        report_progress=report,
+    )
+
+    assert [stage for stage, _ in stages] == [
+        "Preparing",
+        "Processing images",
+        "Building request",
+        "Generating response",
+        "Processing result",
+        "Done",
+    ]
+    assert [value for _, value in stages] == pytest.approx([5, 15, 25, 30, 92, 100])
+
+
 def test_responses_payload_keeps_every_image_input() -> None:
     config = build_config("secret", "https://example.test/v1", "gpt-6-astra", "")
     images = tuple(

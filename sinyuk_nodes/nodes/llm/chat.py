@@ -7,8 +7,10 @@
 
 from __future__ import annotations
 
+from contextlib import suppress
+
 import torch
-from sinyuk_nodes.compat.comfy import io
+from sinyuk_nodes.compat.comfy import ComfyAPI, io
 from sinyuk_nodes.features.llm.chat import execute_chat
 from sinyuk_nodes.features.llm.config import OpenAPIConfig
 from sinyuk_nodes.features.llm.schema import JSONSchemaDocument
@@ -158,6 +160,21 @@ class LLMAPINode(io.ComfyNode):
         reasoning_effort: str = "none",
         unique_id: str | int = "",
     ) -> io.NodeOutput:
+        from server import PromptServer
+
+        server = PromptServer.instance
+        client_id = server.client_id
+
+        async def report_progress(stage: str, value: float) -> None:
+            with suppress(Exception):
+                if client_id is not None:
+                    server.send_sync(
+                        "llm.progress",
+                        {"node_id": str(unique_id), "stage": stage, "progress": value},
+                        client_id,
+                    )
+                await ComfyAPI().execution.set_progress(value, 100, node_id=str(unique_id))
+
         response_format = _RESPONSE_FORMAT_VALUES.get(response_format, response_format)
         result = await execute_chat(
             api_config,
@@ -173,6 +190,7 @@ class LLMAPINode(io.ComfyNode):
             image_detail,
             reasoning_effort,
             unique_id,
+            report_progress,
         )
         return io.NodeOutput(result.response, result.execution_summary)
 
