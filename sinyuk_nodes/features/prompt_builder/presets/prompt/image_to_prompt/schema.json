@@ -70,7 +70,7 @@
     },
     "notes": {
       "type": "string",
-      "description": "Visually important information that does not fit another field. Do not repeat information from other fields. Empty string when unnecessary."
+      "description": "Optional internal analysis note that does not fit another field. Do not repeat information from other fields. This field is not included in the final prompt. Empty string when unnecessary."
     }
   }
 }

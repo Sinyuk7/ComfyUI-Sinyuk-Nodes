@@ -51,8 +51,9 @@ def test_visual_prompt_context_compiles_structured_analysis() -> None:
     prompt = build_prompt(json.dumps(analysis), context=prompt_context)
 
     assert prompt.startswith("A person in a white shirt.")
-    assert 'Include the text "OPEN" at a sign, rendered as white lettering.' in prompt
-    assert "\n\n" not in prompt
+    assert 'Include the text "OPEN" at a sign, rendered as white lettering.' not in prompt
+    assert prompt.endswith("Natural portrait photography.")
+    assert "\n" not in prompt
 
 
 def _fixture_path(name: str = "GarmentAnalysis.json") -> Path:

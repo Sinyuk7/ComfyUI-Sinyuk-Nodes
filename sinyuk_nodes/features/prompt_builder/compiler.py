@@ -557,16 +557,9 @@ def compile_visual_prompt(
         raise ValueError("Visual prompt analysis must be valid JSON.") from exc
     validate_json(raw, schema)
     analysis = _parse_visual_analysis(raw)
-    text_lines = [
-        f'Include the text "{item["content"]}" at {item["location"]}'
-        + (f", rendered as {item['presentation']}." if item["presentation"] else ".")
-        for item in analysis["text"]
-        if item["content"] and item["location"]
-    ]
-    values = {key: value for key, value in analysis.items() if key != "text"}
-    values["text"] = " ".join(text_lines)
+    values = {key: value for key, value in analysis.items() if key not in {"text", "notes"}}
     rendered = Template(template).safe_substitute(values)
-    return "\n".join(line.strip() for line in rendered.splitlines() if line.strip())
+    return " ".join(rendered.split())
 
 
 def build_prompt(llm_response: str, *, context: PromptContext) -> str:
