@@ -1,6 +1,6 @@
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
-import { acceptEvent, balanceText, batchProgress, batchText, selectedParameters, taskProgress } from "./state.mjs";
+import { acceptEvent, balanceText, batchText, selectedParameters, taskProgress } from "./state.mjs";
 
 let catalog;
 const states = new WeakMap();
@@ -29,47 +29,12 @@ function registerLLMProgressListener() {
   });
 }
 
-function progressElement() {
-  const root = document.createElement("div");
-  const track = document.createElement("div");
-  const fill = document.createElement("div");
-  const label = document.createElement("div");
-  root.style.cssText = "box-sizing:border-box;width:100%;height:38px;padding:5px 0;color:var(--input-text);font-size:12px";
-  track.style.cssText = "position:relative;height:8px;overflow:hidden;border-radius:3px;background:rgba(255,255,255,.12)";
-  fill.style.cssText = "height:100%;width:0;background:#3b9cff;transition:width 180ms ease";
-  label.style.cssText = "height:20px;line-height:20px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap";
-  track.append(fill);
-  root.append(track, label);
-  return { root, fill, label };
-}
-
-function renderProgress(state, view) {
-  state.progress.label.textContent = view.text || "Idle";
-  state.progress.root.title = view.tooltip ?? view.text ?? "";
-  state.progress.label.style.color = view.level === "error" ? "#ef4444"
-    : view.level === "warning" ? "#f59e0b" : "";
-  state.progress.fill.style.background = view.level === "error" ? "#ef4444"
-    : view.level === "warning" ? "#f59e0b" : "#3b9cff";
-  state.progress.root.dataset.indeterminate = String(view.indeterminate);
-  state.progress.animation?.cancel();
-  state.progress.animation = null;
-  state.progress.fill.style.width = view.indeterminate ? "35%" : `${Math.max(0, Math.min(100, view.value ?? 0))}%`;
-  state.progress.fill.style.opacity = view.indeterminate ? "0.55" : "1";
-  state.progress.fill.style.transform = "none";
-  if (view.indeterminate) {
-    state.progress.animation = state.progress.fill.animate(
-      [{ transform: "translateX(-110%)" }, { transform: "translateX(300%)" }],
-      { duration: 1200, iterations: Infinity, easing: "ease-in-out" },
-    );
-  }
-}
-
 function showStatus(node, text, level = "error", tooltip = text) {
   const state = states.get(node);
   if (!state) return;
   state.status.value = text;
   state.status.options.tooltip = tooltip;
-  renderProgress(state, { value: 0, indeterminate: false, text, level, tooltip });
+  state.status.options.level = level;
   node.setDirtyCanvas(true, true);
 }
 
@@ -83,8 +48,8 @@ function resetRemoteState(node, provider = providerId(node)) {
   state.modelAbort = null;
   state.sequence = 0;
   state.balance.value = provider === "runninghub" ? balanceText({ state: "unsupported" }) : balanceText({});
-  state.status.value = "";
-  renderProgress(state, { value: 0, indeterminate: false, text: "Idle" });
+  state.status.value = "Idle";
+  state.status.options.tooltip = "";
   if (state.directory) state.directory.value = "";
   node.setDirtyCanvas(true, true);
 }
@@ -202,8 +167,8 @@ function validateSelection(node, profile) {
   const status = states.get(node).status;
   if (invalid) showStatus(node, "Configuration error: parameter removed or invalid");
   else if (status.value.startsWith("Configuration error")) {
-    status.value = "";
-    renderProgress(states.get(node), { value: 0, indeterminate: false, text: "Idle" });
+    status.value = "Idle";
+    status.options.tooltip = "";
   }
 }
 
@@ -301,13 +266,12 @@ app.registerExtension({
           state.balance.options.tooltip = detail.message ?? "";
         } else if (event === "image-api.batch") {
           state.status.value = batchText(detail);
-          renderProgress(state, batchProgress(detail));
           state.status.options.tooltip = detail.directory ?? "";
           if (state.directory) state.directory.value = detail.directory ?? "";
         } else {
           const view = taskProgress(detail);
           state.status.value = view.text;
-          renderProgress(state, view);
+          state.status.options.tooltip = view.tooltip ?? view.text ?? "";
         }
         node.setDirtyCanvas(true, true);
       });
@@ -338,7 +302,7 @@ app.registerExtension({
     if (node.comfyClass === NODE_IDS.llm) {
       const status = node.addWidget("text", "Status", "Idle", () => {}, { serialize: false });
       status.serialize = false;
-      status.disabled = true;
+      status.disabled = false;
       status.options.readOnly = true;
       const state = { status };
       llmStates.set(node, state);
@@ -351,13 +315,10 @@ app.registerExtension({
     if (![NODE_IDS.generate, NODE_IDS.batch].includes(node.comfyClass) || !catalog) return;
     node.properties ??= {};
     const balance = node.addWidget("text", "balance", "", () => {}, { serialize: false });
-    const status = node.addWidget("text", "status", "", () => {}, { serialize: false });
-    const progress = progressElement();
-    const progressWidget = node.addDOMWidget("progress", "div", progress.root, { serialize: false });
-    progressWidget.serialize = false;
+    const status = node.addWidget("text", "Status", "Idle", () => {}, { serialize: false });
     const directory = node.comfyClass === NODE_IDS.batch
       ? node.addWidget("text", "output_directory", "", () => {}, { serialize: false }) : null;
-    for (const item of [balance, status, directory].filter(Boolean)) {
+    for (const item of [balance, directory].filter(Boolean)) {
       item.serialize = false;
       item.disabled = true;
       item.options.readOnly = true;
@@ -366,11 +327,10 @@ app.registerExtension({
     }
     balance.options.tooltip = "Latest account balance state. RunningHub does not provide this check.";
     if (directory) directory.options.tooltip = "Batch output folder on the ComfyUI server.";
-    // Keep machine-readable state without adding another visible row.
-    status.type = "hidden";
-    status.computeSize = () => [0, -4];
-    status.draw = () => {};
-    const state = { balance, status, progress, directory, sequence: 0, previous: {}, configuring: false,
+    status.serialize = false;
+    status.disabled = false;
+    status.options.readOnly = true;
+    const state = { balance, status, directory, sequence: 0, previous: {}, configuring: false,
       modelRequest: 0, modelAbort: null };
     states.set(node, state);
     const model = widget(node, "model");
@@ -422,8 +382,8 @@ app.registerExtension({
           const item = widget(node, `model.${name}`);
           if (item) item.value = value;
         }
-        state.status.value = "";
-        renderProgress(state, { value: 0, indeterminate: false, text: "Idle" });
+        state.status.value = "Idle";
+        state.status.options.tooltip = "";
         void checkModel(node, model.value);
       }
       decorateParameters(node);

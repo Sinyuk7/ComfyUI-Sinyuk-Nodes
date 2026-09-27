@@ -1,7 +1,7 @@
 Use Image 1 as the fixed base subject.
 Preserve identity, face, hairstyle, body proportions, camera view, framing, crop, subject scale, and scene geometry.
 Do not change the pose, limb positions, body-to-body or body-to-environment contacts for garment display.
-Keep the background, lighting, exposure, white balance, and color grading; do not import reference photographic styling.
+Keep the background, lighting, exposure, white balance, color grading, and tonal character; do not import reference photographic styling.
 
 Replace the current outfit completely with the listed Target items, using their assigned references in Images 2 onward.
 Include their attached components, but no unlisted reference-model garments or accessories.
@@ -14,7 +14,7 @@ Subject context:
 ${subject_context}
 
 Preserve target cut, length, proportions, construction, materials, colors, patterns, and defining details.
-Do not add fabric, padding, or structural support absent from the design.
+Do not add fabric, padding, stiffening, or structural support absent from the design.
 Actively present the target's form, volume, drape, and material character with clear, natural depth.
 Reconstruct its worn state for the fixed subject rather than copying pose-specific folds from either image source.
 Garments may spread, lift, separate, compress, and occupy substantially different space; original clothing coverage

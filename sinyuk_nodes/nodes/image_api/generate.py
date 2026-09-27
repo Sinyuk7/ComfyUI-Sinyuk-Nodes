@@ -106,7 +106,7 @@ class ImageGenerate(io.ComfyNode):
         log_event("generation.started", run_id=run_id, node_id=node_id, model=selected)
         # Validate cheap fields before encoding potentially large images.
         client = None
-        ui = None
+        ui = execution_ui(cls.hidden, config, settings.token, settings.provider)
         interrupted = False
 
         cancellation = CancellationState(check_interrupt)
@@ -121,7 +121,6 @@ class ImageGenerate(io.ComfyNode):
             if not files:
                 raise ValueError("Connect 1 to 10 reference images.")
             validate_reference_files(files, enforce_size_limits)
-            ui = execution_ui(cls.hidden, config, settings.token, settings.provider)
             if settings.provider == "runninghub":
                 build_runninghub_request(
                     selected, text, parameters, ["pending"] * len(files), get_runninghub_catalog()
@@ -160,8 +159,8 @@ class ImageGenerate(io.ComfyNode):
             return io.NodeOutput(result)
         except (model_management.InterruptProcessingException, asyncio.CancelledError):
             interrupted = True
-            if ui:
-                ui.stale()
+            await ui.progress("interrupted", None, client.task_id if client else None)
+            ui.stale()
             log_event(
                 "generation.interrupted",
                 level=logging.WARNING,
@@ -172,6 +171,7 @@ class ImageGenerate(io.ComfyNode):
             )
             raise
         except Exception as exc:
+            await ui.progress("failed", None, client.task_id if client else None)
             log_event(
                 "generation.failed",
                 level=logging.ERROR,

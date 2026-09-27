@@ -51,6 +51,7 @@ function percentText(value) {
 function stageText(payload) {
   const progress = validPercent(payload.progress);
   if (payload.stage === "running") return progress === null ? "Generating..." : `Generating: ${percentText(progress)}`;
+  if (payload.stage === "uploading") return "Uploading images...";
   if (payload.stage === "reconnecting") return "Reconnecting...";
   if (payload.stage === "submitting") return "Submitting...";
   if (payload.stage === "downloading") {
@@ -58,12 +59,16 @@ function stageText(payload) {
       ? `Downloading: ${payload.completed} / ${payload.total}` : "Downloading...";
   }
   if (payload.stage === "succeeded") return "Completed";
+  if (payload.stage === "failed") return "Failed";
+  if (payload.stage === "interrupted") return "Cancelled";
   return "Working...";
 }
 
 export function taskProgress(payload) {
   const progress = validPercent(payload.progress);
   if (payload.stage === "succeeded") return { value: 100, indeterminate: false, text: "Completed" };
+  if (payload.stage === "failed") return { value: 0, indeterminate: false, text: "Failed" };
+  if (payload.stage === "interrupted") return { value: 0, indeterminate: false, text: "Cancelled" };
   if (payload.stage === "running" && progress !== null) {
     return { value: progress, indeterminate: false, text: stageText(payload) };
   }
