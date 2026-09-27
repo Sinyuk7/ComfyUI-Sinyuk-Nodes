@@ -50,18 +50,18 @@
         },
         "notes": {
           "type": "string",
-          "description": "Only garment-relevant pose, body/environment contact, or occlusion information not captured by crop/pose/view. Do not repeat styling or describe original clothing. Use compact phrases; empty string when unnecessary."
+          "description": "Compact garment-relevant pose, body/environment contact, spatial constraints, or clearly supported motion not captured by crop/pose/view. Body and scene geometry remain fixed; original clothing coverage and garment-related occlusion do not. Do not infer wind, direction, or strength solely from original garment movement. Do not describe original clothing, repeat styling, or record proposed motion as fact. Empty string when unnecessary."
         },
         "styling": {
           "type": "string",
-          "description": "Only stable, compatible styling relationships from Image 1 that materially affect the whole outfit, such as layering, tuck, overlap, sleeve treatment, or accessory placement. No generic styling commentary, garment identity, color, print, logo, exact construction, hidden details, background, or lighting. Use compact phrases; empty string when unnecessary."
+          "description": "Only explicitly useful, physically compatible outfit-level relationships from Image 1 that fill a gap left by target reference styling and item-specific presentation. Fallback only; never override either. Do not transfer original garment identity, silhouette, volume, fit, wrinkles, drape, motion, or styling feel, or describe background and lighting. Compact phrases; empty string when no useful gap remains."
         }
       }
     },
     "garments": {
       "type": "array",
       "minItems": 1,
-      "description": "Target outfit items shown in Images 2 onward, including garments, footwear, bags, belts, hats, and accessories.",
+      "description": "Target garments, footwear, and accessories identified by user instructions and the focus of Images 2 onward. Include complete ensembles when intended; omit incidental reference-model styling pieces without evidence they are targets. No counterpart in Image 1 is required. Attached components belong to their parent item.",
       "items": {
         "type": "object",
         "additionalProperties": false,
@@ -94,11 +94,11 @@
           },
           "presentation": {
             "type": "string",
-            "description": "Only non-obvious, item-specific wearing adjustments required by the fixed pose or compatible styling that materially affect reconstruction. Do not repeat shape, subject.styling, visible pose, or generic natural-wearing instructions. Empty string when no special handling is needed."
+            "description": "Compact concrete choices for a favorable, physically plausible worn state that clearly expresses target shape and material character under fixed body geometry, camera, crop, and scene. Specify the relevant part and its desired worn state through folds, spatial volume, separation, opening, tension, contact, or motion; express the existing design rather than defining a new structure. Garment-only changes and resulting occlusion may be substantial, but preserve target cut, proportions, construction, material behavior, intended wearing configuration, and design-defined fullness. Static structure and dynamic flow are equally valid; do not default to stiffness, smoothing, or motion. Added motion is allowed in static scenes when explicitly specified here, not recorded as observed fact. Target reference styling and presentation override Image 1 styling. Do not repeat other fields or explain reasoning; leave routine rendering to the image model. Empty string when no additional item-specific direction is useful."
           },
           "key_details": {
             "type": "array",
-            "description": "A few distinctive, high-impact, source-grounded features that define the item or are easy to miss from the main reference, ordered by importance. Select per item, not per image. Omit ordinary visible construction, redundant, tiny, ambiguous, or hidden details. Empty array when no explicit attention is needed.",
+            "description": "A few distinctive, high-impact, source-grounded features that define the item or are easy to miss from the main reference, ordered by importance. Select per item, not per image. Evaluate relevance under the planned target presentation and fixed view/crop, not original clothing coverage. Reliable close-up evidence may supply details revealed by valid garment-only changes. Omit unsupported, ambiguous, generic, redundant, or low-impact details, and details that remain hidden without affecting the visible result. Empty array when no explicit attention is needed.",
             "items": {
               "type": "object",
               "additionalProperties": false,

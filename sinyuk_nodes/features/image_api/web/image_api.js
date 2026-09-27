@@ -24,11 +24,7 @@ function registerLLMProgressListener() {
     const state = llmStates.get(node);
     if (!state) return;
     state.status.value = detail.stage ?? "Working";
-    renderProgress(state, {
-      value: Number.isFinite(detail.progress) ? detail.progress : 0,
-      indeterminate: false,
-      text: detail.stage ?? "Working",
-    });
+    state.status.options.tooltip = `${detail.stage ?? "Working"} (${Math.round(detail.progress ?? 0)}%)`;
     node.setDirtyCanvas(true, true);
   });
 }
@@ -340,19 +336,12 @@ app.registerExtension({
       return;
     }
     if (node.comfyClass === NODE_IDS.llm) {
-      const status = node.addWidget("text", "llm_status", "", () => {}, { serialize: false });
-      const progress = progressElement();
-      const progressWidget = node.addDOMWidget("llm_progress", "div", progress.root, { serialize: false });
-      progressWidget.serialize = false;
+      const status = node.addWidget("text", "Status", "Idle", () => {}, { serialize: false });
       status.serialize = false;
       status.disabled = true;
       status.options.readOnly = true;
-      status.type = "hidden";
-      status.computeSize = () => [0, -4];
-      status.draw = () => {};
-      const state = { status, progress };
+      const state = { status };
       llmStates.set(node, state);
-      renderProgress(state, { value: 0, indeterminate: false, text: "Idle" });
       return;
     }
     if (node.comfyClass === NODE_IDS.config) {

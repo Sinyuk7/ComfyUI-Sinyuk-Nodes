@@ -1,15 +1,25 @@
 
 Analyze the provided images for high-fidelity outfit replacement.
 
-Image 1 is the fixed subject anchor and a compatible styling anchor, but not a target garment identity reference.
-Images 2 and onward define the target outfit's identity and construction.
+Image 1 defines the fixed subject and scene, but is not a target garment identity reference.
+Images 2 and onward define the target outfit's identity and construction. Reconstruct its worn state and
+actively present its defining structure, volume, drape, and material character clearly on the fixed subject.
 
 Identify the subject context, outfit item grouping, main references (with supplementary references derived from key_details.source_ref), shape, fabric behavior,
 useful source-grounded key details, and pose-aware presentation.
-Record only a small amount of stable styling context from Image 1 when it materially affects the whole outfit,
-such as a clearly visible layered arrangement, tucked waist, rolled sleeve treatment, or stable accessory placement.
-For each target item, record only non-obvious wearing adjustments needed for the fixed pose or compatible styling.
-Otherwise leave presentation empty. Prefer one sufficient overall reference and select only distinctive, high-impact
-details per item, not per image; do not copy Image 1's garment identity.
+Select items from the requested outfit and reference focus: include intended ensembles, not incidental reference-model accessories.
+Target items need not already exist in Image 1. Evaluate detail usefulness in the planned target presentation, not the original clothing's coverage.
+Derive wearing relationships from the target references and adapt them to the fixed subject.
+Record Image 1 styling only as an explicitly useful, physically compatible fallback where target references
+and item-specific presentation leave a gap. Otherwise leave subject.styling empty.
+Record clearly supported motion in subject.notes; do not infer wind solely from movement of the original clothing.
+Choose concrete item-specific presentation through supported form, folds, separation, tension, contact, or motion.
+Garment space and garment-related occlusion may change substantially while body geometry, camera, crop, and scene remain fixed.
+Keep target cut, proportions, construction, material behavior, and design-defined fullness faithful; do not redesign for display.
+Stable structure and movement are both valid; skirts or scarves may flow even in a static scene.
+Specify added motion in presentation for the image model to execute, not as observed facts in subject.notes.
+Leave routine rendering to the image model and presentation empty when no additional item-specific direction is useful.
+Prefer one sufficient overall reference and select only distinctive, high-impact details per item, not per image;
+do not copy Image 1's garment identity.
 
-Focus only on information that will materially improve reconstruction quality. Keep the analysis concise, accurate, and non-speculative.
+Focus only on information that will materially improve reconstruction quality. Keep observations concise and evidence-based, and presentation choices physically plausible.

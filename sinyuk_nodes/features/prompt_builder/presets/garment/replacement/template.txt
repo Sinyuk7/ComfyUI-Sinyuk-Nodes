@@ -1,42 +1,31 @@
 Use Image 1 as the fixed base subject.
-Preserve the person's identity, face, hairstyle, body proportions, pose, camera view, framing, crop, subject scale,
-limb positions, body-to-body and body-to-environment contacts, and subject/scene occlusion.
-Preserve Image 1's background, lighting direction, exposure, white balance, color grading, and tonal character.
-Do not import reference backgrounds or photographic lighting. Integrate the target outfit into Image 1's lighting
-with physically consistent local shading and contact shadows.
+Preserve identity, face, hairstyle, body proportions, camera view, framing, crop, subject scale, and scene geometry.
+Do not change the pose, limb positions, body-to-body or body-to-environment contacts for garment display.
+Keep the background, lighting, exposure, white balance, and color grading; do not import reference photographic styling.
 
-Replace the current outfit completely with the target outfit defined by Images 2 and onward.
-Images 2 and onward define the target garments' identity, category, silhouette, construction, colors, patterns,
-materials, accessories, and source-grounded details.
-
-The clothing in Image 1 is not authoritative for target garment identity, category, color, print, logo,
-exact construction, or exact detail placement. When compatible with the target outfit, use Image 1 only as
-a light styling prior for layering logic, overlap or tuck state, sleeve treatment, waist relationship,
-accessory placement, and overall outfit coherence. Do not copy its original garment identity or exact details.
-
-Priority order:
-1. Preserve Image 1 subject geometry and composition.
-2. Replace the outfit according to Images 2 onward.
-3. Within those constraints, retain compatible styling relationships from Image 1.
-4. Render physically coherent, dimensional garments.
+Replace the current outfit completely with the listed Target items, using their assigned references in Images 2 onward.
+Include their attached components, but no unlisted reference-model garments or accessories.
+Image 1 governs the person and scene; target references govern garment design. Analysis guides interpretation without
+overriding clear visual evidence. Compatible Image 1 styling only fills gaps left by target references and Presentation.
 
 ${outfit_items}
 
 Subject context:
 ${subject_context}
 
-Adapt the target outfit naturally to the fixed subject and pose.
-Do not change the pose, limb positions, body-to-body or body-to-environment contacts, framing, or crop
-to reveal hidden garments, hems, shoes, accessories, or details. Do not rearrange the subject or scene to expose them.
-Allow garment coverage and garment-related occlusion to change as required by the target outfit.
-Preserve the intended visible silhouette, structure, volume, drape, and important details of each target item.
-Use natural folds, compression, overlap, and deformation consistent with the pose, fabric behavior, and motion.
+Preserve target cut, length, proportions, construction, materials, colors, patterns, and defining details.
+Do not add fabric, padding, or structural support absent from the design.
+Actively present the target's form, volume, drape, and material character with clear, natural depth.
+Reconstruct its worn state for the fixed subject rather than copying pose-specific folds from either image source.
+Garments may spread, lift, separate, compress, and occupy substantially different space; original clothing coverage
+is not a constraint. Openings and deformation must respect target construction and specified wearing configuration.
+Preserve designed pleats and gathers while letting their folds respond naturally.
 
-Render each garment as a three-dimensional worn construction with readable shoulder, sleeve, waist, hem, overlap,
-and contact relationships. Make layering physically coherent: inner layers remain under outer layers, hems and cuffs
-overlap naturally, and waistbands, straps, and closures sit on the correct garment surface. Avoid pasted-on surfaces,
-collapsed fabric, random wrinkling, or artificially inflated volume.
+Follow Presentation for deliberate wearing and motion choices, including added motion in static scenes.
+Otherwise resolve natural drape from the pose and supported motion, without adding wind or decorative movement.
+Original garment movement alone does not establish wind.
 
-When appropriate for the garment type, fabric, pose, and framing, allow subtle natural motion that helps reveal shape, drape, and dimensionality. Keep the motion physically plausible and preserve the intended silhouette and important details.
-
-Rebuild garment edges, overlaps, occlusion, folds, and contact naturally so the outfit looks genuinely worn by the subject.
+Reconstruct the target outfit as physically worn items. Resolve folds, layering, contact, and occlusion from the new
+spatial relationships. Garment-only changes may reveal details; do not relocate details or violate depth ordering
+for visibility. Not everything must appear inside the crop.
+Render materials under Image 1's lighting with consistent shading and contact shadows, avoiding pasted-on or floating forms.

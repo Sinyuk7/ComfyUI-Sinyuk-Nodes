@@ -90,7 +90,7 @@ def test_compile_prompt_renders_all_items_and_compact_references() -> None:
     assert "Images 2 and 3" in prompt
     assert "Image 3: Simple rounded almond-toe flat" in prompt
     assert "Do not change the pose, limb positions, body-to-body" in prompt
-    assert "three-dimensional worn construction" in prompt
+    assert "Reconstruct the target outfit as physically worn items" in prompt
 
 
 def test_compile_prompt_preserves_detail_order_and_derives_detail_refs() -> None:
@@ -157,7 +157,7 @@ def test_garment_analysis_context_loads_all_protocol_parts() -> None:
 
     assert context.system_prompt.startswith("You analyze images")
     assert context.user_prompt.startswith("Analyze the provided images")
-    assert "compatible styling anchor" in context.system_prompt
+    assert "Image 1 defines the fixed subject and scene" in context.system_prompt
     assert "not a target garment identity reference" in context.user_prompt
     assert context.schema.name == "garment_replacement"
 

@@ -1,73 +1,27 @@
-`sinyuk_nodes/features/prompt_builder/` 实现一个两阶段的服装换装提示词流程：
+# 服装预设设计
 
-```text
-Image 1 人物图
-+ Images 2..N 目标穿搭参考图
-        ↓
-Vision LLM
-(system.txt + user.txt + schema.json)
-        ↓
-GarmentAnalysis JSON
-        ↓
-compiler.py
-        ↓
-template.txt + templates/outfit_item.txt
-        ↓
-最终 Image Editing Prompt
-        ↓
-Nano Banana / GPT Image
-```
+两个服装预设共用“Analyzer 分析图片 → JSON → Compiler 组装提示词 → Image Model 执行”的流程，区别在于原图服装是否保留。
 
-核心职责：
+## Replacement：重建并展示目标穿搭
 
-* `system.txt`：定义 Vision LLM 的分析规则和图片角色。
-* `user.txt`：触发当前图片分析任务，保持简洁。
-* `schema.json`：定义 `GarmentAnalysis JSON` 的固定数据结构。
-* `compiler.py`：纯 Python 编译器，把 JSON 确定性组装成最终 Prompt，不调用 LLM、不重新推理。
-* `outfit_item.txt`：单个服装 / 鞋 / 包 / 配件的 Prompt 模板。
-* `template.txt`：最终换装 Prompt 的全局模板。
-* `__init__.py`：Feature 的导出和注册入口。
+- Image 1 固定人物身份、身体几何、姿态、接触关系、镜头、构图、背景和摄影条件。
+- Images 2+ 定义目标服装、鞋与配饰的身份、剪裁、比例、结构、材质和细节；不继承原衣物的轮廓、体积、褶皱和动态。按用户要求和参考主体选品：整套目标完整纳入，单品参考的陪衬不自动加入；不要求原图已有对应单品。
+- 在目标设计与物理合理性内，主动优化商品表现力。衣物可显著改变展开、分离、垂坠、张力和占据空间，并重新形成衣物相关遮挡；不能改人体、改设计或凭空增加布量。合法衣物变化可显露细节，但不移动细节或违反空间遮挡来强行展示。
+- 静态支撑与动态展开均可。Analyzer 在 `presentation` 中指定有价值的呈现选择，包括静态场景中的新增动态；Image Model 执行并完成局部褶皱、接触与光影，不自行追加展示性动态。
+- `subject.notes` 记录真实空间约束与有依据的运动，不仅凭原衣飘动推断风。`subject.styling` 仅补充目标参考与 presentation 未定义且确有用处的兼容穿着关系。
 
-核心边界：
+## Enhancement：保留并精修已有穿搭
 
-```text
-Vision LLM = 理解图片
-Schema = 结构化数据协议
-Compiler = 确定性组装
-Templates = Prompt 表达结构
-Image Model = 执行最终换装
-```
+- Image 1 同时定义人物、场景和已有穿搭；保留整体轮廓、体积、位置、叠穿、穿法与动态。
+- Images 2+ 仅用于已有单品的可靠细节纠正、材质精修和附属组件补全，不新增独立单品或重新设计穿搭。
+- 允许必要的局部边缘、褶皱、接触和阴影修正；无可靠证据的区域保留。商品本色纠正需有依据，不把光照、曝光或白平衡差异当成商品色差。
+- Analyzer 提供简洁的参考信息，不做逐项错误诊断；Image Model 负责视觉比对与修正。复杂 Logo、文字、印花直接依赖引用图片，不猜测内容。
+- `shape` 提供结构上下文，不替换原轮廓；`subject.styling` 表达需保留的已有穿搭关系。不增加风感或飘动。
 
-以下图片角色与优先级适用于 Replacement 预设。
+## 信息与实现边界
 
-Image 1 是固定主体锚点，同时可以作为兼容的 styling prior：它提供人物身份、姿势、构图、视角、四肢位置、身体自身及身体与环境的接触关系和主体/场景遮挡，也可以在不与目标服装冲突时提示叠穿关系、塞入状态、袖口处理、腰部关系和配件摆放。Image 1 的原服装不是目标服装身份参考。
-Images 2..N 定义目标 outfit 的身份、类别、版型、结构、颜色、图案、材质和具体细节，包括服装、鞋、包、腰带等。
-
-优先级必须保持：
-
-```text
-Image 1 主体几何与构图
-→ Images 2..N 的目标服装身份与结构
-→ Image 1 的兼容 styling prior
-→ 立体、自然、物理一致的服装表现
-```
-
-不要为了展示隐藏的衣物或细节而改变 Image 1 的姿势、四肢位置、身体自身及身体与环境的接触关系、裁切或构图，也不重排主体或场景。允许目标服装所需的覆盖范围和衣物相关遮挡变化。保持 Image 1 的背景、光照方向、曝光、白平衡和色调影调；允许新衣物所需的局部阴影重建。Analyzer 不将背景和灯光编码为服装数据。
-
-Reference 应遵循“最小充分引用”：整体版型的 `main_refs` 优先一张清晰全貌图，仅在必要结构信息互补时增加引用，具体局部细节在 `key_details[].source_ref` 中绑定一个最清晰、最权威的来源；compiler 会从这些 source_ref 确定性派生补充细节引用，不再维护独立的 `detail_refs`。避免无意义的多图交叉引用。
-
-V2 协议删除 `id`、`must_preserve` 和 `priority`。`shape` 表达固有版型结构，`key_details` 按重要性顺序表达超出 shape 的显著细节，`subject.styling` 仅承载 Image 1 的兼容穿搭先验。
-
-
-资源由 preset manifest、system/user prompt、单一 schema.json 和可选模板组成。
-Prompt Context 输出 system prompt、user prompt、JSON Schema 和 Prompt Context；
-Schema Placement 只决定 schema 是否写入 system prompt，不配置 LLM 的 response format。
-Prompt Builder 接收 Prompt Context 与 LLM response，使用 jsonschema 校验后按 compiler
-路由；Garment 是当前已有的一个 compiler，不修改通用 LLM 节点。
-
-Enhancement 保留原图人物、姿势、构图、背景、灯光、色调影调及已有穿搭整体轮廓；
-参考图只用于原图中已有服装和配饰的可靠细节纠正、材质精修与组件补全，不新增独立单品。
-允许必要的局部形态、遮挡、接触阴影变化，不改变手势或为新增物品虚构支撑结构。
-没有可靠对应物的参考条目应省略；不自动添加参考模特的陪衬配饰。
-subject.styling 表达需保留的已有穿搭关系，shape 仅提供结构上下文。
-不要求逐项错误诊断；复杂 Logo、印花优先引用图片，不猜测文字。
+- `shape` 描述结构，`fabric_behavior` 描述材质行为，`presentation` 描述具体穿着或呈现；字段间避免重复，无增量时允许空值。
+- 引用保持最小充分；Replacement 的 `main_refs` 优先一张必要全貌图。`key_details` 只选少数高价值特征，每条绑定一个最清晰的 `source_ref`，由 Compiler 派生补充引用。
+- 输出使用紧凑英文短语，不把参考图翻译成商品规格清单，不编造含糊或不可辨认的细节。优化文本信息密度，不以填满字段或固定数量为目标。
+- System 定义分析规则，User 触发任务，Schema 定义数据契约，模板表达最终编辑要求；行为调整需保持四者一致。
+- Compiler 只校验和确定性组装，不推理、不调用模型。预设行为放在预设资源中，不扩展通用 LLM 节点；Schema Placement 只控制 Schema 是否进入提示词，不配置模型 response format。
