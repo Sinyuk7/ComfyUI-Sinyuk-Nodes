@@ -68,6 +68,7 @@ async def _complete(
     api_key: str,
     payload: dict[str, object],
     path: str,
+    extra_headers: dict[str, str] | None = None,
     cancellation: CancellationState | None = None,
 ) -> object:
     state = cancellation or CancellationState(check_interrupt)
@@ -105,7 +106,10 @@ async def _complete(
                 client,
                 "POST",
                 f"{base_url}/{path}",
-                headers={"Authorization": f"Bearer {api_key}"},
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    **(extra_headers or {}),
+                },
                 payload=payload,
                 cancellation=state,
             )
@@ -161,9 +165,10 @@ async def complete_response(
     api_key: str,
     payload: dict[str, object],
     cancellation: CancellationState | None = None,
+    extra_headers: dict[str, str] | None = None,
 ) -> object:
     """Submit a synchronous response once, without speculative idempotency."""
-    return await _complete(base_url, api_key, payload, "responses", cancellation)
+    return await _complete(base_url, api_key, payload, "responses", extra_headers, cancellation)
 
 
 __all__ = [

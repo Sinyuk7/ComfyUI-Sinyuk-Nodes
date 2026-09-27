@@ -1,6 +1,9 @@
 Use Image 1 as the fixed base subject.
 Preserve the person's identity, face, hairstyle, body proportions, pose, camera view, framing, crop, subject scale,
-limb positions, contact points, and natural occlusion exactly.
+limb positions, body-to-body and body-to-environment contacts, and subject/scene occlusion.
+Preserve Image 1's background, lighting direction, exposure, white balance, color grading, and tonal character.
+Do not import reference backgrounds or photographic lighting. Integrate the target outfit into Image 1's lighting
+with physically consistent local shading and contact shadows.
 
 Replace the current outfit completely with the target outfit defined by Images 2 and onward.
 Images 2 and onward define the target garments' identity, category, silhouette, construction, colors, patterns,
@@ -23,8 +26,9 @@ Subject context:
 ${subject_context}
 
 Adapt the target outfit naturally to the fixed subject and pose.
-Do not change the pose, limb positions, contact points, garment coverage, natural occlusion, framing, or crop
-to reveal hidden garments, hems, shoes, accessories, or details.
+Do not change the pose, limb positions, body-to-body or body-to-environment contacts, framing, or crop
+to reveal hidden garments, hems, shoes, accessories, or details. Do not rearrange the subject or scene to expose them.
+Allow garment coverage and garment-related occlusion to change as required by the target outfit.
 Preserve the intended visible silhouette, structure, volume, drape, and important details of each target item.
 Use natural folds, compression, overlap, and deformation consistent with the pose, fabric behavior, and motion.
 

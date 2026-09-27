@@ -421,7 +421,6 @@ def _render_item(index: int, garment: _Garment, preset: str) -> str:
         f"Image {detail['source_ref']}: {detail['description'].strip().rstrip('.。')}."
         for detail in garment["key_details"]
     ]
-    key_details = "\n".join(detail_lines) if detail_lines else "No additional key details."
     detail_refs: list[int] = []
     for detail in garment["key_details"]:
         ref = detail["source_ref"]
@@ -437,21 +436,19 @@ def _render_item(index: int, garment: _Garment, preset: str) -> str:
         "references": references,
         "shape": garment["shape"],
         "fabric_behavior": garment["fabric_behavior"],
-        "key_details": key_details,
+        "key_details": "\n".join(detail_lines),
         "presentation": garment["presentation"],
     }
     template = _asset("templates/outfit_item.txt", preset)
-    if preset.rsplit("/", maxsplit=1)[-1] == "enhancement":
-        values["key_details"] = "\n".join(detail_lines)
-        # Each optional section belongs to one field in the bundled item template.
-        template = "\n\n".join(
-            block
-            for block in template.split("\n\n")
-            if not any(
-                "${" + field + "}" in block and not values[field].strip()
-                for field in ("shape", "fabric_behavior", "key_details", "presentation")
-            )
+    # Each optional section belongs to one field in the bundled item template.
+    template = "\n\n".join(
+        block
+        for block in template.split("\n\n")
+        if not any(
+            "${" + field + "}" in block and not values[field].strip()
+            for field in ("shape", "fabric_behavior", "key_details", "presentation")
         )
+    )
     return Template(template).substitute(values).strip()
 
 

@@ -89,7 +89,7 @@ def test_compile_prompt_renders_all_items_and_compact_references() -> None:
     assert "Target item 2" in prompt
     assert "Images 2 and 3" in prompt
     assert "Image 3: Simple rounded almond-toe flat" in prompt
-    assert "Do not change the pose, limb positions, contact points" in prompt
+    assert "Do not change the pose, limb positions, body-to-body" in prompt
     assert "three-dimensional worn construction" in prompt
 
 
@@ -217,7 +217,8 @@ def test_builder_rejects_unknown_or_modified_schema() -> None:
         load_prompt_context("../unknown")
 
 
-def test_enhancement_omits_empty_sections_and_deduplicates_references() -> None:
+@pytest.mark.parametrize("preset", ["replacement", "enhancement"])
+def test_garment_presets_omit_empty_sections_and_deduplicate_references(preset: str) -> None:
     data = json.loads(_fixture())
     data["garments"] = data["garments"][:1]
     item = data["garments"][0]
@@ -228,17 +229,21 @@ def test_enhancement_omits_empty_sections_and_deduplicates_references() -> None:
         presentation="",
         key_details=[],
     )
-    prompt = compile_prompt(json.dumps(data), schema=load_preset_schema("enhancement"))
+    prompt = compile_prompt(json.dumps(data), schema=load_preset_schema(preset))
     assert "Use Images 2 and 3 as the main references." in prompt
     assert "Reference structure:" not in prompt
     assert "Material properties (" not in prompt
     assert "Source-grounded details:" not in prompt
     assert "Wearing and integration" not in prompt
     assert "No additional key details." not in prompt
+    assert "Shape:" not in prompt
+    assert "Fabric behavior:" not in prompt
+    assert "Key details:" not in prompt
+    assert "Presentation:" not in prompt
 
     item["presentation"] = "Wear naturally from the shoulder."
-    prompt = compile_prompt(json.dumps(data), schema=load_preset_schema("enhancement"))
-    assert "Wearing and integration" in prompt
+    prompt = compile_prompt(json.dumps(data), schema=load_preset_schema(preset))
+    assert ("Presentation:" if preset == "replacement" else "Wearing and integration") in prompt
     assert "Wear naturally from the shoulder." in prompt
 
 

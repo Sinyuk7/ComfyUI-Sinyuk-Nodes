@@ -92,7 +92,7 @@ class LLMAPINode(io.ComfyNode):
                 ),
                 io.Combo.Input(
                     "image_detail",
-                    options=["auto", "low", "high", "original"],
+                    options=["auto", "low", "medium", "high", "original"],
                     default="high",
                     display_name="Image Detail",
                     tooltip="Detail level used when preparing images for the LLM API.",
@@ -138,6 +138,7 @@ class LLMAPINode(io.ComfyNode):
                     tooltip="Markdown-formatted node-side request and response diagnostics.",
                 ),
             ],
+            hidden=[io.Hidden.unique_id],
         )
 
     @classmethod
@@ -155,6 +156,7 @@ class LLMAPINode(io.ComfyNode):
         top_p: float | None = None,
         max_tokens: int | None = None,
         reasoning_effort: str = "none",
+        unique_id: str | int = "",
     ) -> io.NodeOutput:
         response_format = _RESPONSE_FORMAT_VALUES.get(response_format, response_format)
         result = await execute_chat(
@@ -170,6 +172,7 @@ class LLMAPINode(io.ComfyNode):
             json_schema,
             image_detail,
             reasoning_effort,
+            unique_id,
         )
         return io.NodeOutput(result.response, result.execution_summary)
 

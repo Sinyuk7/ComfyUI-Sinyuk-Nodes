@@ -8,6 +8,8 @@ Identify the subject context, outfit item grouping, main references (with supple
 useful source-grounded key details, and pose-aware presentation.
 Record only a small amount of stable styling context from Image 1 when it materially affects the whole outfit,
 such as a clearly visible layered arrangement, tucked waist, rolled sleeve treatment, or stable accessory placement.
-For each target item, describe how it can use compatible styling relationships without copying Image 1's garment identity.
+For each target item, record only non-obvious wearing adjustments needed for the fixed pose or compatible styling.
+Otherwise leave presentation empty. Prefer one sufficient overall reference and select only distinctive, high-impact
+details per item, not per image; do not copy Image 1's garment identity.
 
 Focus only on information that will materially improve reconstruction quality. Keep the analysis concise, accurate, and non-speculative.

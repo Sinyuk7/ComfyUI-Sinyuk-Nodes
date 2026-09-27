@@ -4,17 +4,18 @@ from __future__ import annotations
 
 import httpx
 import pytest
+import torch
 from comfy.model_management import InterruptProcessingException
+from sinyuk_nodes.features.llm import chat as chat_feature
 from sinyuk_nodes.features.llm import client
 from sinyuk_nodes.features.llm.chat import (
-    _execution_summary,
     _response_text,
     _responses_text,
     build_payload,
     build_responses_payload,
 )
 from sinyuk_nodes.features.llm.config import build_config
-from sinyuk_nodes.features.llm.image import EncodedImage
+from sinyuk_nodes.features.llm.image import EncodedImage, encode_image
 from sinyuk_nodes.features.llm.schema import JSONSchemaDocument, parse_json_schema
 
 _SCHEMA = JSONSchemaDocument(
@@ -111,6 +112,12 @@ def test_image_detail_is_sent_to_each_image() -> None:
     ]
 
 
+def test_medium_image_detail_resizes_long_edge_to_1024() -> None:
+    image = encode_image(torch.zeros((1600, 2400, 3)), detail="medium")
+
+    assert (image.width, image.height) == (1024, 682)
+
+
 def test_refusal_is_reported_separately_from_malformed_content() -> None:
     with pytest.raises(ValueError, match="The model refused the request: unsafe request"):
         _response_text({"choices": [{"message": {"content": None, "refusal": "unsafe request"}}]})
@@ -176,6 +183,58 @@ def test_responses_text_extracts_output_text() -> None:
     )
 
 
+def test_responses_payload_includes_previous_response_id() -> None:
+    config = build_config("secret", "https://example.test/v1", "gpt-6-astra", "")
+
+    payload = build_responses_payload(
+        config,
+        "",
+        "Continue.",
+        (),
+        previous_response_id="resp_123",
+    )
+
+    assert payload["previous_response_id"] == "resp_123"
+
+
+@pytest.mark.anyio
+async def test_qwen_session_cache_uses_internal_response_chain(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config = build_config(
+        "secret",
+        "https://maas.qianwenaiapi.com/compatible-mode/v1",
+        "custom",
+        "qwen3.8-flash",
+        session_cache=True,
+    )
+    calls: list[tuple[dict[str, object], dict[str, str] | None]] = []
+
+    async def fake_complete_response(
+        base_url: str,
+        api_key: str,
+        payload: dict[str, object],
+        cancellation: object,
+        extra_headers: dict[str, str] | None = None,
+    ) -> object:
+        calls.append((payload, extra_headers))
+        response_id = "resp_a" if len(calls) == 1 else "resp_b"
+        return {
+            "id": response_id,
+            "output": [{"type": "message", "content": [{"type": "output_text", "text": "OK"}]}],
+        }
+
+    monkeypatch.setattr(chat_feature, "complete_response", fake_complete_response)
+    unique_id = "session-test"
+    await chat_feature.execute_chat(config, "", "First", None, 1, unique_id=unique_id)
+    await chat_feature.execute_chat(config, "", "Second", None, 2, unique_id=unique_id)
+
+    assert calls[0][0].get("previous_response_id") is None
+    assert calls[1][0]["previous_response_id"] == "resp_a"
+    assert calls[0][1] == {"x-dashscope-session-cache": "enable"}
+    assert calls[1][1] == {"x-dashscope-session-cache": "enable"}
+
+
 def test_responses_payload_keeps_every_image_input() -> None:
     config = build_config("secret", "https://example.test/v1", "gpt-6-astra", "")
     images = tuple(
@@ -220,24 +279,6 @@ def test_json_schema_requires_connection_for_structured_output() -> None:
     config = build_config("secret", "https://example.test/v1", "gpt-6-astra", "")
     with pytest.raises(ValueError, match="Connect a JSON Schema"):
         build_payload(config, "", "Reply.", (), response_format="json_schema")
-
-
-def test_execution_summary_is_markdown() -> None:
-    config = build_config("secret", "https://example.test/v1", "gpt-6-astra", "")
-    summary = _execution_summary(config, "json_schema", _SCHEMA, 4, "high", 2048, "miss", 123, "{}")
-    assert summary == (
-        "### Execution Summary\n\n"
-        "- **API:** `resp`\n"
-        "- **Model:** `gpt-6-astra`\n"
-        "- **Response format:** `JSON Schema`\n"
-        "- **JSON Schema:** `status_result`\n"
-        "- **Images:** `4` (`high` detail)\n"
-        "- **Max tokens:** `2048`\n"
-        "- **Reasoning effort:** `none`\n"
-        "- **Cache:** `miss`\n"
-        "- **Elapsed:** `123 ms`\n"
-        "- **Output length:** `2` characters"
-    )
 
 
 @pytest.mark.anyio

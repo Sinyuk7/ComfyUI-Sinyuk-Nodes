@@ -67,6 +67,12 @@ class OpenAPIConfigNode(io.ComfyNode):
                     display_name="API Mode",
                     tooltip="Responses API is recommended for new integrations.",
                 ),
+                io.Boolean.Input(
+                    "session_cache",
+                    default=False,
+                    display_name="Session Cache",
+                    tooltip="Enable provider-supported session caching for Responses requests.",
+                ),
             ],
             outputs=[
                 OPENAPI_CONFIG.Output(
@@ -87,13 +93,21 @@ class OpenAPIConfigNode(io.ComfyNode):
         base_url: str,
         model_selection: str,
         custom_model_id: str,
+        session_cache: bool = False,
     ) -> io.NodeOutput:
         check_interrupt()
         if provider != "openapi":
             raise ValueError("Only the openapi provider is supported.")
         api_modes = {"Responses API": "responses", "Chat Completions": "chat_completions"}
         normalized_mode = api_modes.get(api_mode, api_mode)
-        config = build_config(api_key, base_url, model_selection, custom_model_id, normalized_mode)
+        config = build_config(
+            api_key,
+            base_url,
+            model_selection,
+            custom_model_id,
+            normalized_mode,
+            session_cache,
+        )
         return io.NodeOutput(config)
 
 

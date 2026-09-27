@@ -12,12 +12,13 @@ import numpy as np
 import torch
 from PIL import Image
 
-ImageDetail = Literal["auto", "low", "high", "original"]
+ImageDetail = Literal["auto", "low", "medium", "high", "original"]
 
 # GPT-5.6-oriented client preprocessing limits.
 _PATCH_SIZE = 32
 _DETAIL_LIMITS: dict[str, tuple[int, int | None]] = {
     "low": (512, None),
+    "medium": (1024, None),
     "high": (2048, 2500),
 }
 _RANGE_EPSILON = 1e-6
@@ -96,11 +97,13 @@ def _detail(value: str) -> ImageDetail:
         return "auto"
     if value == "low":
         return "low"
+    if value == "medium":
+        return "medium"
     if value == "high":
         return "high"
     if value == "original":
         return "original"
-    raise ValueError("Image detail must be one of: auto, low, high, original.")
+    raise ValueError("Image detail must be one of: auto, low, medium, high, original.")
 
 
 def encode_image(image: torch.Tensor, detail: str = "high", index: int = 1) -> EncodedImage:

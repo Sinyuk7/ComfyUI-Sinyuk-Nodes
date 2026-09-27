@@ -9,7 +9,6 @@ ${shape}
 Fabric behavior:
 ${fabric_behavior}
 
-
 Key details:
 ${key_details}
 

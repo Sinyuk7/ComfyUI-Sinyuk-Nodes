@@ -36,6 +36,7 @@ class OpenAPIConfig:
     model_selection: str
     custom_model_id: str
     api_mode: str = "responses"
+    session_cache: bool = False
 
     @property
     def model(self) -> str:
@@ -58,6 +59,7 @@ def build_config(
     model_selection: str,
     custom_model_id: str,
     api_mode: str = "responses",
+    session_cache: bool = False,
 ) -> OpenAPIConfig:
     """Validate node values and create a runtime configuration."""
 
@@ -80,6 +82,7 @@ def build_config(
         model_selection=model_selection,
         custom_model_id=custom_model_id.strip(),
         api_mode=api_mode,
+        session_cache=session_cache,
     )
 
 
