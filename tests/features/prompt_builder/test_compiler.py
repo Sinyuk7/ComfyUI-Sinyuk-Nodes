@@ -17,7 +17,42 @@ from sinyuk_nodes.features.prompt_builder import (
 
 
 def test_prompt_presets_are_discovered_from_manifests() -> None:
-    assert available_presets() == ["face.swap", "garment.enhancement", "garment.replacement"]
+    assert available_presets() == [
+        "face.swap",
+        "garment.enhancement",
+        "garment.replacement",
+        "prompt.image_to_prompt",
+    ]
+
+
+def test_visual_prompt_context_compiles_structured_analysis() -> None:
+    context = load_prompt_context("prompt.image_to_prompt")
+    analysis = {
+        "subject": "A person in a white shirt.",
+        "composition": "Waist-up framing with the subject centered.",
+        "camera": "Eye-level view with moderate background separation.",
+        "scene": "A quiet indoor room.",
+        "lighting": "Soft daylight from the left.",
+        "appearance": "Natural skin texture and matte cotton fabric.",
+        "color": "Muted neutral colors with low contrast.",
+        "style": "Natural portrait photography.",
+        "text": [{"content": "OPEN", "location": "a sign", "presentation": "white lettering"}],
+        "notes": "",
+    }
+    prompt_context = PromptContext(
+        preset_id=context.preset_id,
+        version=context.version,
+        schema=context.schema,
+        example=context.example,
+        compiler_id=context.compiler_id,
+        template=context.template,
+    )
+
+    prompt = build_prompt(json.dumps(analysis), context=prompt_context)
+
+    assert prompt.startswith("A person in a white shirt.")
+    assert 'Include the text "OPEN" at a sign, rendered as white lettering.' in prompt
+    assert "\n\n" not in prompt
 
 
 def _fixture_path(name: str = "GarmentAnalysis.json") -> Path:

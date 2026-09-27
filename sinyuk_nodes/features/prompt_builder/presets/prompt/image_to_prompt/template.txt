@@ -1,0 +1,10 @@
+${subject}
+${scene}
+${composition}
+${camera}
+${lighting}
+${appearance}
+${color}
+${style}
+${text}
+${notes}

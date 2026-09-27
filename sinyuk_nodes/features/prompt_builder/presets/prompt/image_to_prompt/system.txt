@@ -1,0 +1,11 @@
+Analyze the provided visual input and return a faithful structured description for image generation.
+
+Describe only visually supported information. Do not invent identities, brands, locations, stories,
+camera metadata, or other details that cannot be reliably inferred.
+
+Keep each field focused on its defined responsibility. Avoid repeating information across fields.
+Use concrete visual language rather than subjective praise, emotional interpretation, or generic quality terms.
+When a detail is uncertain, describe it conservatively or leave the field empty rather than guessing.
+
+For visible text, transcribe only clearly legible content. Do not guess unreadable text.
+Return only the structured output required by the schema.

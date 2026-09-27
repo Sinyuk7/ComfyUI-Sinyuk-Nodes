@@ -43,6 +43,25 @@ class _Analysis(TypedDict):
     garments: list[_Garment]
 
 
+class _TextElement(TypedDict):
+    content: str
+    location: str
+    presentation: str
+
+
+class _VisualAnalysis(TypedDict):
+    subject: str
+    composition: str
+    camera: str
+    scene: str
+    lighting: str
+    appearance: str
+    color: str
+    style: str
+    text: list[_TextElement]
+    notes: str
+
+
 @dataclass(frozen=True)
 class LoadedPromptContext:
     """Loaded prompts and schema for one prompt preset."""
@@ -484,12 +503,78 @@ def compile_prompt(
     )
 
 
+def _parse_visual_analysis(value: object) -> _VisualAnalysis:
+    if not _is_object_dict(value):
+        raise ValueError("Invalid visual analysis: expected an object.")
+    string_fields = (
+        "subject",
+        "composition",
+        "camera",
+        "scene",
+        "lighting",
+        "appearance",
+        "color",
+        "style",
+        "notes",
+    )
+    parsed: dict[str, object] = {}
+    for field in string_fields:
+        field_value = value.get(field)
+        if not isinstance(field_value, str):
+            raise ValueError(f"Invalid visual analysis: {field} must be a string.")
+        parsed[field] = field_value.strip()
+    text_value = value.get("text")
+    if not _is_object_list(text_value):
+        raise ValueError("Invalid visual analysis: text must be an array.")
+    text_elements: list[_TextElement] = []
+    for index, item in enumerate(text_value):
+        if not _is_object_dict(item):
+            raise ValueError(f"Invalid visual analysis: text[{index}] must be an object.")
+        fields: dict[str, str] = {}
+        for field in ("content", "location", "presentation"):
+            field_value = item.get(field)
+            if not isinstance(field_value, str):
+                raise ValueError(
+                    f"Invalid visual analysis: text[{index}].{field} must be a string."
+                )
+            fields[field] = field_value.strip()
+        text_elements.append(_TextElement(**fields))
+    parsed["text"] = text_elements
+    return _VisualAnalysis(**parsed)
+
+
+def compile_visual_prompt(
+    analysis_json: str,
+    *,
+    schema: JSONSchemaDocument,
+    template: str,
+) -> str:
+    """Compile structured visual analysis into a natural-language prompt."""
+
+    try:
+        raw: object = json.loads(analysis_json)
+    except json.JSONDecodeError as exc:
+        raise ValueError("Visual prompt analysis must be valid JSON.") from exc
+    validate_json(raw, schema)
+    analysis = _parse_visual_analysis(raw)
+    text_lines = [
+        f'Include the text "{item["content"]}" at {item["location"]}'
+        + (f", rendered as {item['presentation']}." if item["presentation"] else ".")
+        for item in analysis["text"]
+        if item["content"] and item["location"]
+    ]
+    values = {key: value for key, value in analysis.items() if key != "text"}
+    values["text"] = " ".join(text_lines)
+    rendered = Template(template).safe_substitute(values)
+    return "\n".join(line.strip() for line in rendered.splitlines() if line.strip())
+
+
 def build_prompt(llm_response: str, *, context: PromptContext) -> str:
     """Build a prompt from a preset context and a structured LLM response."""
 
     if context.schema is None:
         raise ValueError("Prompt Builder requires the preset JSON Schema.")
-    if context.compiler_id == "garment" and context.template is None:
+    if context.compiler_id in {"garment", "visual"} and context.template is None:
         raise ValueError("Prompt Builder requires the preset Prompt template.")
     try:
         value: object = json.loads(llm_response)
@@ -501,6 +586,12 @@ def build_prompt(llm_response: str, *, context: PromptContext) -> str:
             json.dumps(value, ensure_ascii=False),
             schema=context.schema,
             preset=context.preset_id.rsplit(".", maxsplit=1)[-1],
+            template=context.template,
+        )
+    if context.compiler_id == "visual":
+        return compile_visual_prompt(
+            json.dumps(value, ensure_ascii=False),
+            schema=context.schema,
             template=context.template,
         )
     if context.compiler_id == "template":
@@ -521,6 +612,7 @@ __all__ = [
     "available_presets",
     "preset_tooltip",
     "compile_prompt",
+    "compile_visual_prompt",
     "load_preset_schema",
     "load_prompt_context",
 ]

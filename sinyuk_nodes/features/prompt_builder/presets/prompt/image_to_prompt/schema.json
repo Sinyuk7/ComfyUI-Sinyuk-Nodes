@@ -1,0 +1,76 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "subject",
+    "composition",
+    "camera",
+    "scene",
+    "lighting",
+    "appearance",
+    "color",
+    "style",
+    "text",
+    "notes"
+  ],
+  "properties": {
+    "subject": {
+      "type": "string",
+      "description": "The visible primary subject or subjects, including count, appearance, pose, action, clothing, expression, gaze, and relationships."
+    },
+    "composition": {
+      "type": "string",
+      "description": "The arrangement of visual elements in the frame, including framing, crop, subject placement, scale, negative space, and foreground, midground, and background organization."
+    },
+    "camera": {
+      "type": "string",
+      "description": "Observable viewpoint, camera height, angle, viewing direction, perspective character, and depth of field. Do not infer exact camera, lens, focal length, aperture, or exposure metadata."
+    },
+    "scene": {
+      "type": "string",
+      "description": "The visible environment and spatial context, including location type, architecture, background, objects, ground, weather, and relevant surroundings."
+    },
+    "lighting": {
+      "type": "string",
+      "description": "Visible light sources, direction, softness, contrast, shadow behavior, ambient fill, backlight, rim light, and reflected light."
+    },
+    "appearance": {
+      "type": "string",
+      "description": "Visible physical and surface qualities such as skin, hair, fabric behavior, materials, textures, reflections, and fine details."
+    },
+    "color": {
+      "type": "string",
+      "description": "Dominant colors and tonal relationships, including saturation, contrast, white-balance character, and highlight-shadow color relationships."
+    },
+    "style": {
+      "type": "string",
+      "description": "A concise observable medium, genre, or visual treatment. Avoid subjective praise and generic quality labels."
+    },
+    "text": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["content", "location", "presentation"],
+        "properties": {
+          "content": {
+            "type": "string",
+            "description": "Clearly legible text transcribed exactly."
+          },
+          "location": {
+            "type": "string",
+            "description": "Where the text appears in the image."
+          },
+          "presentation": {
+            "type": "string",
+            "description": "Visible typography, color, size, material, or layout when reliably observable. Empty string when unavailable."
+          }
+        }
+      }
+    },
+    "notes": {
+      "type": "string",
+      "description": "Visually important information that does not fit another field. Do not repeat information from other fields. Empty string when unnecessary."
+    }
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "id": "prompt.image_to_prompt",
+  "version": 1,
+  "display_name": "Image to Prompt",
+  "desc": "Analyze one image into structured visual context and compile a generation prompt.",
+  "compiler": "visual"
+}
