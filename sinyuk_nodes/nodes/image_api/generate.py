@@ -22,7 +22,7 @@ from ...features.image_api.images import (
 from ...features.image_api.request_builder import build_request, build_runninghub_request
 from ...features.image_api.runninghub_client import RunningHubClient
 from ...features.image_api.runninghub_config import get_runninghub_catalog
-from ...features.image_api.workflow import normalize_inputs, provider_profile
+from ...features.image_api.workflow import normalize_inputs, provider_profile, scalar
 from .config import APIConfigType
 from .schema import model_input_options
 
@@ -70,6 +70,16 @@ class ImageGenerate(io.ComfyNode):
                     display_name="Images",
                     tooltip="Required reference images sent together in order (1-10 PNG images).",
                 ),
+                io.String.Input(
+                    "external_aspect_ratio",
+                    display_name="Aspect Ratio Override",
+                    optional=True,
+                    force_input=True,
+                    tooltip=(
+                        "Optional logical aspect ratio override, such as 16:9. When connected, "
+                        "it takes precedence over the model's manual aspect ratio."
+                    ),
+                ),
             ],
             outputs=[
                 io.Image.Output(
@@ -92,12 +102,23 @@ class ImageGenerate(io.ComfyNode):
         return float("nan")
 
     @classmethod
-    async def execute(cls, api_config=None, model=None, prompt=None, images=None):
+    async def execute(
+        cls, api_config=None, model=None, prompt=None, images=None, external_aspect_ratio=None
+    ):
         from comfy import model_management
 
         from .host import execution_ui
 
         settings, selected, text, parameters = normalize_inputs(api_config, model, prompt)
+        if external_aspect_ratio is not None:
+            if settings.provider != "runninghub":
+                raise ValueError(
+                    "External aspect ratio is currently supported only for RunningHub."
+                )
+            external_ratio = scalar(external_aspect_ratio, "external_aspect_ratio")
+            if not isinstance(external_ratio, str) or not external_ratio.strip():
+                raise ValueError("Connected external aspect ratio must be a nonempty string.")
+            parameters["aspectRatio"] = external_ratio
         config = settings.apply(get_config())
         profile = provider_profile(settings, selected)
         run_id = new_run_id()

@@ -242,3 +242,25 @@ async def test_cdn_download_respects_environment_proxy(owner, monkeypatch, tmp_p
         assert received == [url]
     finally:
         await server.cleanup()
+
+
+def test_runninghub_external_ratio_is_canonicalized_by_model_adapter() -> None:
+    from sinyuk_nodes.features.image_api.request_builder import build_runninghub_request
+    from sinyuk_nodes.features.image_api.runninghub_config import get_runninghub_catalog
+
+    catalog = get_runninghub_catalog()
+    model = "rh:gpt-image-2.5-flare-stable"
+    parameters = {name: rule.default for name, rule in catalog.profile(model).parameters.items()}
+    parameters["aspectRatio"] = "7:3"
+    request = build_runninghub_request(
+        model, "edit", parameters, ["https://example.test/a"], catalog
+    )
+    assert request["aspectRatio"] == "21:9"
+
+    parameters["aspectRatio"] = "30:17"
+    with pytest.raises(ValueError, match=r"30:17.*not supported"):
+        build_runninghub_request(model, "edit", parameters, ["https://example.test/a"], catalog)
+
+    parameters["aspectRatio"] = "16/9"
+    with pytest.raises(ValueError, match="two positive integers"):
+        build_runninghub_request(model, "edit", parameters, ["https://example.test/a"], catalog)

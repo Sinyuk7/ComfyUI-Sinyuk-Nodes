@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from math import gcd
 from typing import TypeGuard
 
 from .config import Config
@@ -84,6 +85,8 @@ def build_runninghub_request(
     }
     for name, rule in profile.parameters.items():
         value = parameters.get(name)
+        if name == "aspectRatio" and isinstance(value, str):
+            value = canonical_runninghub_ratio(value, rule.values)
         if not isinstance(value, str) or value not in rule.values:
             raise ValueError(
                 f"Invalid or missing {name} for the selected model; update the workflow explicitly."
@@ -92,3 +95,31 @@ def build_runninghub_request(
             continue
         request[name] = value
     return request
+
+
+def canonical_runninghub_ratio(value: str, supported: Sequence[str]) -> str:
+    """Match a logical integer ratio to the model's canonical provider ratio."""
+    if value == "auto" and value in supported:
+        return value
+    parts = value.strip().split(":")
+    if len(parts) != 2:
+        raise ValueError("Aspect ratio must be two positive integers separated by ':'.")
+    try:
+        width, height = (int(part) for part in parts)
+    except ValueError:
+        raise ValueError("Aspect ratio must be two positive integers separated by ':'.") from None
+    if width <= 0 or height <= 0:
+        raise ValueError("Aspect ratio dimensions must be positive integers.")
+    divisor = gcd(width, height)
+    width //= divisor
+    height //= divisor
+    for ratio in supported:
+        if ratio == "auto":
+            continue
+        ratio_width, ratio_height = (int(part) for part in ratio.split(":"))
+        if width * ratio_height == height * ratio_width:
+            return ratio
+    raise ValueError(
+        f"Aspect ratio {width}:{height} is not supported by the selected model. "
+        f"Supported ratios: {', '.join(supported)}."
+    )
