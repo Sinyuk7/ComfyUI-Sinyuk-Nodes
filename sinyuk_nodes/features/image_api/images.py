@@ -15,6 +15,7 @@ from PIL import Image
 MAX_REFERENCE_IMAGES = 10
 MAX_REFERENCE_IMAGE_BYTES = 10_000_000
 MAX_REFERENCE_TOTAL_BYTES = 50_000_000
+MAX_MASK_BYTES = 4_000_000
 
 
 def _is_object_list(value: object) -> TypeGuard[list[object]]:
@@ -163,6 +164,41 @@ def encode_file_payloads(files: Sequence[bytes], encoding: str = "base64_png") -
     return [prefix + base64.b64encode(value).decode("ascii") for value in files]
 
 
+def prepare_mask(mask: object, target_size: tuple[int, int]) -> bytes:
+    """Convert one ComfyUI MASK to an OpenAI-compatible RGBA PNG."""
+    if not isinstance(mask, torch.Tensor) or mask.ndim != 3 or mask.shape[0] != 1:
+        raise ValueError("MASK must contain exactly one image with shape [1,H,W].")
+    if min(mask.shape) < 1 or not torch.isfinite(mask).all():
+        raise ValueError("MASK must contain finite values.")
+    if mask.min() < 0 or mask.max() > 1:
+        raise ValueError("MASK values must be in the [0,1] range.")
+    values = mask[0].detach().to(device="cpu", dtype=torch.float32).numpy()
+    if float(values.max()) <= 1e-6:
+        raise ValueError("MASK contains no editable area.")
+    source_height, source_width = values.shape
+    target_width, target_height = target_size
+    source_ratio = source_width / source_height
+    target_ratio = target_width / target_height
+    if not math.isclose(source_ratio, target_ratio, rel_tol=0, abs_tol=1e-6):
+        raise ValueError("MASK and the first input image must have the same aspect ratio.")
+    image = Image.fromarray((values * 255).round().astype(np.uint8), mode="L")
+    if image.size != target_size:
+        image = image.resize(target_size, Image.Resampling.BILINEAR)
+    alpha = Image.fromarray(255 - np.asarray(image, dtype=np.uint8), mode="L")
+    rgba = Image.new("RGBA", target_size, (0, 0, 0, 255))
+    rgba.putalpha(alpha)
+    value = _encode_png(rgba)
+    if len(value) > MAX_MASK_BYTES:
+        raise ValueError("Encoded MASK PNG exceeds the 4 MB provider limit.")
+    try:
+        with Image.open(BytesIO(value)) as check:
+            if check.size != target_size or "A" not in check.getbands():
+                raise ValueError("Encoded MASK PNG failed structural validation.")
+    except (OSError, Image.DecompressionBombError):
+        raise ValueError("Encoded MASK PNG failed structural validation.") from None
+    return value
+
+
 def decode_image(data: bytes) -> torch.Tensor:
     try:
         with Image.open(BytesIO(data)) as image:
@@ -179,3 +215,14 @@ def decode_image(data: bytes) -> torch.Tensor:
     except (OSError, Image.DecompressionBombError):
         raise ValueError("Downloaded result is not a decodable supported image.") from None
     return torch.tensor(array, dtype=torch.float32).unsqueeze(0)
+
+
+def image_size(data: bytes) -> tuple[int, int]:
+    try:
+        with Image.open(BytesIO(data)) as image:
+            image.load()
+            if getattr(image, "n_frames", 1) != 1:
+                raise ValueError("Animated/multiframe input is not supported.")
+            return image.size
+    except (OSError, Image.DecompressionBombError):
+        raise ValueError("Encoded input image is not a supported image.") from None

@@ -25,12 +25,40 @@ from .errors import clean_message
 logger = logging.getLogger(__name__)
 
 
+async def upload_mask_via_runninghub(
+    content: bytes,
+    base_url: str,
+    api_key: str,
+    config: Config,
+    check_cancel: Callable[[], None] = lambda: None,
+) -> str:
+    """Upload a GRSAI mask through RunningHub's confirmed media endpoint."""
+    from dataclasses import replace
+
+    upload_config = replace(config, base_url=base_url)
+    client = RunningHubClient(upload_config, api_key, check_cancel, endpoint="/generate")
+    async with aiohttp.ClientSession() as session:
+        return await client.upload_image(session, content, 1)
+
+
 def _is_json_object(value: object) -> TypeGuard[dict[str, object]]:
     return isinstance(value, dict)
 
 
 def _is_object_list(value: object) -> TypeGuard[list[object]]:
     return isinstance(value, list)
+
+
+def _usage(value: object) -> dict[str, str]:
+    if not _is_json_object(value):
+        return {}
+    allowed = {
+        "thirdPartyConsumeMoney",
+        "consumeMoney",
+        "consumeCoins",
+        "taskCostTime",
+    }
+    return {name: item for name, item in value.items() if name in allowed and isinstance(item, str)}
 
 
 class RunningHubClient(GrsaiClient):
@@ -260,6 +288,6 @@ class RunningHubClient(GrsaiClient):
                 await self._notify(
                     "downloading", index * 100 / len(urls), {"completed": index, "total": len(urls)}
                 )
-            await self._notify("succeeded", 100)
+            await self._notify("succeeded", 100, {"usage": _usage(data.get("usage"))})
             self.remote_status = "SUCCESS"
             return images

@@ -47,6 +47,7 @@ function resetRemoteState(node, provider = providerId(node)) {
   state.modelAbort?.abort();
   state.modelAbort = null;
   state.sequence = 0;
+  state.usageShown = false;
   state.balance.value = provider === "runninghub" ? balanceText({ state: "unsupported" }) : balanceText({});
   state.status.value = "Idle";
   state.status.options.tooltip = "";
@@ -71,6 +72,30 @@ function providerId(node) {
 
 function activeCatalog(node, provider = providerId(node)) {
   return catalog.providers[provider] ?? catalog.providers.grsai;
+}
+
+function syncMaskInput(node, profile) {
+  const input = node.inputs?.find((item) => item.name === "mask");
+  if (!input) return;
+  const connected = input.link != null;
+  const model = widget(node, "model")?.value;
+  const supported = profile?.family === "gpt_image"
+    || (providerId(node) === "runninghub" && String(model).startsWith("rh:gpt-image-2.5-"));
+  input.hidden = !supported && !connected;
+  input.label = supported ? "MASK" : "MASK (GPT Image 2.5 only)";
+  input.tooltip = supported
+    ? "Optional mask; applies only to the first input image."
+    : "This mask is only supported by GPT Image 2.5 Sunburst and Flare.";
+}
+
+function usageText(usage) {
+  if (!usage || typeof usage !== "object") return "";
+  const parts = [];
+  if (usage.consumeCoins) parts.push(`RH coins: ${usage.consumeCoins}`);
+  if (usage.consumeMoney) parts.push(`Runtime cost: ${usage.consumeMoney}`);
+  if (usage.thirdPartyConsumeMoney) parts.push(`API cost: ${usage.thirdPartyConsumeMoney}`);
+  if (usage.taskCostTime) parts.push(`Time: ${usage.taskCostTime}`);
+  return parts.join(" · ");
 }
 
 function syncProvider(node, providerIdOverride = providerId(node)) {
@@ -130,6 +155,9 @@ function decorateParameters(node, provider = providerId(node)) {
     showStatus(node, "Configuration error: model removed or disabled");
     return;
   }
+  const modelWidget = widget(node, "model");
+  modelWidget.options.tooltip = profile.description || "";
+  syncMaskInput(node, profile);
   for (const [name, rule] of Object.entries(profile.parameters)) {
     const item = widget(node, `model.${name}`);
     if (!item) continue;
@@ -272,6 +300,19 @@ app.registerExtension({
           const view = taskProgress(detail);
           state.status.value = view.text;
           state.status.options.tooltip = view.tooltip ?? view.text ?? "";
+          const usage = usageText(detail.usage);
+          if (event === "image-api.progress" && detail.stage === "succeeded"
+              && usage && node.comfyClass === NODE_IDS.generate && !state.usageShown) {
+            state.usageShown = true;
+            app.extensionManager?.toast?.add?.({
+              severity: "success",
+              summary: "RunningHub task completed",
+              detail: usage,
+              life: 9000,
+            });
+            state.status.value = `Completed · ${usage}`;
+            state.status.options.tooltip = usage;
+          }
         }
         node.setDirtyCanvas(true, true);
       });
@@ -331,7 +372,7 @@ app.registerExtension({
     status.disabled = false;
     status.options.readOnly = true;
     const state = { balance, status, directory, sequence: 0, previous: {}, configuring: false,
-      modelRequest: 0, modelAbort: null };
+      modelRequest: 0, modelAbort: null, usageShown: false };
     states.set(node, state);
     const model = widget(node, "model");
     model.value = activeCatalog(node).default_model;
@@ -368,6 +409,10 @@ app.registerExtension({
       node.onConnectionsChange = function (type, slot, connected, ...rest) {
         const result = connections?.call(this, type, slot, connected, ...rest);
         if (this.inputs?.[slot]?.name === "api_config") syncProvider(this);
+        if (this.inputs?.[slot]?.name === "mask") {
+          const profile = activeCatalog(this).models[widget(this, "model")?.value];
+          syncMaskInput(this, profile);
+        }
         return result;
       };
     }

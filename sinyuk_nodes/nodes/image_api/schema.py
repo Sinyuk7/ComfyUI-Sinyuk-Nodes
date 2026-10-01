@@ -12,6 +12,7 @@ PARAMETER_TOOLTIPS = {
     "imageSize": "Output resolution tier supported by the selected model.",
     "resolution": "Output resolution tier supported by the selected model.",
     "quality": "Provider quality or processing tier supported by the selected model.",
+    "input_fidelity": "How strongly input image details are preserved during editing.",
 }
 
 
@@ -27,6 +28,7 @@ def model_input_options() -> list[io.DynamicCombo.Option]:
                 "imageSize": "Resolution",
                 "resolution": "Resolution",
                 "quality": "Quality",
+                "input_fidelity": "Input Fidelity",
             }[name]
             inputs.append(
                 io.Combo.Input(

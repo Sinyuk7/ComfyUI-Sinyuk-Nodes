@@ -281,6 +281,20 @@
         "value": "max",
         "label": "max"
       }
+    ],
+    "input_fidelity": [
+      {
+        "value": "default",
+        "label": "Provider default"
+      },
+      {
+        "value": "low",
+        "label": "low"
+      },
+      {
+        "value": "high",
+        "label": "high"
+      }
     ]
   },
   "profiles": {
@@ -346,6 +360,10 @@
         "quality": {
           "preset": "quality_flare",
           "default": "medium"
+        },
+        "input_fidelity": {
+          "preset": "input_fidelity",
+          "default": "default"
         }
       }
     },
@@ -359,6 +377,10 @@
         "quality": {
           "preset": "quality_sunburst",
           "default": "medium"
+        },
+        "input_fidelity": {
+          "preset": "input_fidelity",
+          "default": "default"
         }
       }
     }
@@ -381,37 +403,18 @@
     {
       "enabled": true,
       "models": [
-        "gpt-image-2"
-      ],
-      "profile": "gpt_standard"
-    },
-    {
-      "enabled": true,
-      "models": [
-        "gpt-image-2-vip"
-      ],
-      "profile": "gpt_vip"
-    },
-    {
-      "enabled": true,
-      "models": [
-        "gpt-image-2.5"
-      ],
-      "profile": "gpt_standard"
-    },
-    {
-      "enabled": true,
-      "models": [
         "gpt-image-2.5-flare"
       ],
-      "profile": "gpt_flare"
+      "profile": "gpt_flare",
+      "description": "Recommended for fast, high-quality everyday generation and MASK editing."
     },
     {
       "enabled": true,
       "models": [
         "gpt-image-2.5-sunburst"
       ],
-      "profile": "gpt_sunburst"
+      "profile": "gpt_sunburst",
+      "description": "Recommended for precision editing and MASK workflows."
     }
   ]
 }

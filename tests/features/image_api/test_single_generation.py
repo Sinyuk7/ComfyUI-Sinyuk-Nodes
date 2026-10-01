@@ -6,6 +6,28 @@ from sinyuk_nodes.features.image_api.client import GrsaiClient
 from sinyuk_nodes.features.image_api.config import get_config
 
 
+def test_prepare_mask_scales_and_inverts_alpha() -> None:
+    from io import BytesIO
+
+    from PIL import Image
+    from sinyuk_nodes.features.image_api.images import prepare_mask
+
+    value = prepare_mask(torch.tensor([[[0.0, 1.0], [0.5, 0.0]]]), (4, 4))
+    with Image.open(BytesIO(value)) as image:
+        assert image.size == (4, 4)
+        assert image.mode == "RGBA"
+        alpha = image.getchannel("A")
+        assert alpha.getpixel((0, 0)) == 255
+        assert alpha.getpixel((3, 0)) == 0
+
+
+def test_prepare_mask_rejects_different_aspect_ratio() -> None:
+    from sinyuk_nodes.features.image_api.images import prepare_mask
+
+    with pytest.raises(ValueError, match="same aspect ratio"):
+        prepare_mask(torch.ones((1, 2, 2)), (4, 2))
+
+
 @pytest.mark.asyncio
 async def test_single_generation_submits_polls_and_downloads(
     monkeypatch: pytest.MonkeyPatch,

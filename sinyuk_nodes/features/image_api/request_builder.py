@@ -36,6 +36,7 @@ def build_request(
     parameters: object,
     encoded_images: object,
     config: Config,
+    mask_url: object = None,
 ) -> dict[str, object]:
     profile = config.profile(model)
     if not isinstance(prompt, str):
@@ -52,12 +53,20 @@ def build_request(
         "images": list(encoded_images),
         "replyType": "async",
     }
+    if mask_url is not None:
+        if profile.family != "gpt_image":
+            raise ValueError("The selected model does not support a native MASK.")
+        if not isinstance(mask_url, str) or not mask_url.startswith("https://"):
+            raise ValueError("MASK upload did not return a valid HTTPS URL.")
+        request["mask"] = mask_url
     for name, rule in profile.parameters.items():
         value = parameters.get(name)
         if not isinstance(value, str) or value not in rule.values:
             raise ValueError(
                 f"Invalid or missing {name} for the selected model; update the workflow explicitly."
             )
+        if name == "input_fidelity" and value == "default":
+            continue
         request[name] = value
     return request
 
@@ -68,6 +77,7 @@ def build_runninghub_request(
     parameters: object,
     image_urls: object,
     catalog: RunningHubCatalog,
+    mask_url: object = None,
 ) -> dict[str, object]:
     profile = catalog.profile(model)
     if not isinstance(prompt, str) or not prompt.strip():
@@ -83,6 +93,12 @@ def build_runninghub_request(
         "imageUrls": list(image_urls),
         **profile.fixed,
     }
+    if mask_url is not None:
+        if not isinstance(mask_url, str) or not mask_url.startswith("https://"):
+            raise ValueError("MASK upload did not return a valid HTTPS URL.")
+        if not model.startswith("rh:gpt-image-2.5-"):
+            raise ValueError("The selected RunningHub model does not support a native MASK.")
+        request["maskUrl"] = mask_url
     for name, rule in profile.parameters.items():
         value = parameters.get(name)
         if name == "aspectRatio" and isinstance(value, str):

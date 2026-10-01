@@ -56,6 +56,7 @@ class Config:
     transport: Transport
     models: Mapping[str, Profile]
     batch_reference_limit: int = 10
+    descriptions: Mapping[str, str] = MappingProxyType({})
 
     def profile(self, model: str) -> Profile:
         if model not in self.models:
@@ -70,6 +71,7 @@ class Config:
             "models": {
                 model: {
                     "family": profile.family,
+                    "description": self.descriptions.get(model, ""),
                     "parameters": {
                         name: {
                             "default": param.default,
@@ -228,7 +230,7 @@ def parse_config(raw: object) -> Config:
     profiles: dict[str, Profile] = {}
     family_fields = {
         "nano_banana": {"aspectRatio", "imageSize"},
-        "gpt_image": {"aspectRatio", "quality"},
+        "gpt_image": {"aspectRatio", "quality", "input_fidelity"},
     }
     for name, profile in raw_profiles.items():
         _text(name, "profile name")
@@ -249,11 +251,11 @@ def parse_config(raw: object) -> Config:
         family = _text(profile["family"], "family")
         if family not in family_fields:
             raise ConfigError("Unsupported profile family.")
+        required_parameters = (
+            {"aspectRatio", "quality"} if family == "gpt_image" else family_fields[family]
+        )
         params = _object(
-            profile["parameters"],
-            family_fields[family],
-            family_fields[family],
-            "profile parameters",
+            profile["parameters"], family_fields[family], required_parameters, "profile parameters"
         )
         parsed: dict[str, Parameter] = {}
         for field, rule in params.items():
@@ -268,10 +270,14 @@ def parse_config(raw: object) -> Config:
     if not _is_object_list(groups) or not groups:
         raise ConfigError("model_groups must be a nonempty list.")
     models: dict[str, Profile] = {}
+    descriptions: dict[str, str] = {}
     seen: set[str] = set()
     for group in groups:
         group = _object(
-            group, {"enabled", "models", "profile"}, {"enabled", "models", "profile"}, "model group"
+            group,
+            {"enabled", "models", "profile", "description"},
+            {"enabled", "models", "profile"},
+            "model group",
         )
         profile = _text(group["profile"], "profile reference")
         if type(group["enabled"]) is not bool or profile not in profiles:
@@ -279,6 +285,9 @@ def parse_config(raw: object) -> Config:
         group_models = group["models"]
         if not _is_object_list(group_models) or not group_models:
             raise ConfigError("Each model group must contain models.")
+        description = group.get("description", "")
+        if not isinstance(description, str):
+            raise ConfigError("Model description must be a string.")
         for model in group_models:
             model = _text(model, "model")
             if model in seen:
@@ -286,10 +295,18 @@ def parse_config(raw: object) -> Config:
             seen.add(model)
             if group["enabled"]:
                 models[model] = profiles[profile]
+                descriptions[model] = description
     default = _text(raw["default_model"], "default_model")
     if default not in models:
         raise ConfigError("default_model must be enabled.")
-    return Config(base, default, transport, MappingProxyType(models), local_limit)
+    return Config(
+        base,
+        default,
+        transport,
+        MappingProxyType(models),
+        local_limit,
+        MappingProxyType(descriptions),
+    )
 
 
 def load_config(directory: Path | None = None) -> Config:

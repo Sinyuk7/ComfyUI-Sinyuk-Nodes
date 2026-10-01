@@ -50,9 +50,10 @@ class GenerateRunner:
         progress: Progress | None = None,
         provider: Literal["grsai", "runninghub"] = "grsai",
         endpoint: str = "/v1/api/generate",
+        mask_url: str | None = None,
     ) -> None:
-        if type(concurrency) is not int or not 1 <= concurrency <= 10:
-            raise ValueError("Max concurrency must be an integer from 1 to 10.")
+        if type(concurrency) is not int or not 1 <= concurrency <= 100:
+            raise ValueError("Max concurrency must be an integer from 1 to 100.")
         if not prompts:
             raise ValueError("At least one generation prompt is required.")
         self.config = config
@@ -66,6 +67,7 @@ class GenerateRunner:
         self.progress = progress
         self.provider = provider
         self.endpoint = endpoint
+        self.mask_url = mask_url
         self.completed = 0
         self.submitted = False
         self._lock = asyncio.Lock()
@@ -114,7 +116,7 @@ class GenerateRunner:
                 )
                 urls = await client.upload_images(self.files)
                 request = build_runninghub_request(
-                    self.model, prompt, self.parameters, urls, catalog
+                    self.model, prompt, self.parameters, urls, catalog, self.mask_url
                 )
             else:
                 request = build_request(
@@ -123,6 +125,7 @@ class GenerateRunner:
                     self.parameters,
                     encode_file_payloads(self.files, self.config.transport.image_encoding),
                     self.config,
+                    self.mask_url,
                 )
                 client = GrsaiClient(
                     self.config,
