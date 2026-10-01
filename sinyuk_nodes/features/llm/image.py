@@ -14,12 +14,12 @@ from PIL import Image
 
 ImageDetail = Literal["auto", "low", "medium", "high", "original"]
 
-# GPT-5.6-oriented client preprocessing limits.
+# Client-side detail profiles, independent of provider-side image limits.
 _PATCH_SIZE = 32
 _DETAIL_LIMITS: dict[str, tuple[int, int | None]] = {
-    "low": (512, None),
-    "medium": (1024, None),
-    "high": (2048, 2500),
+    "low": (768, None),
+    "medium": (1280, None),
+    "high": (1600, None),
 }
 _RANGE_EPSILON = 1e-6
 

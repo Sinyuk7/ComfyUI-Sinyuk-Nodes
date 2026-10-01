@@ -1,7 +1,1 @@
-Analyze the provided images for head replacement.
-
-Image 1 is the fixed base image. Images 2 onward jointly define the target person's head, face, hair, and makeup.
-
-Summarize only reliable target-head characteristics and any unusual integration issue that would materially help the final edit.
-
-Return only JSON matching the schema.
+Analyze the provided images for head replacement and return concise observations matching the JSON schema.

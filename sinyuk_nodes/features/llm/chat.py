@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import logging
 from collections import OrderedDict
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
@@ -40,6 +41,7 @@ _RESPONSE_SESSIONS: dict[tuple[str, str, str, str], str] = {}
 ProgressReporter = Callable[[str, float], Awaitable[None]]
 _PROGRESS_INTERVAL = 0.5
 _VIRTUAL_PROGRESS_RATE = 2.0
+_LOGGER = logging.getLogger(__name__)
 
 
 async def _report(
@@ -116,6 +118,19 @@ async def execute_chat(
         _RESPONSE_SESSIONS.pop(session_key, None)
     await _report(report_progress, "Processing images", 15)
     encoded = await cancellation.wait(run_blocking(encode_images, images, image_detail))
+    for index, image in enumerate(encoded, start=1):
+        _LOGGER.info(
+            "llm.image model=%s detail=%s index=%s width=%s height=%s mime=%s "
+            "encoded_bytes=%s data_uri_bytes=%s",
+            config.model,
+            image_detail,
+            index,
+            image.width,
+            image.height,
+            image.mime_type,
+            len(image.encoded_bytes),
+            len(image.base64_data_url.encode("ascii")),
+        )
     await _report(report_progress, "Building request", 25)
     payload_builder = build_responses_payload if config.api_mode == "responses" else build_payload
     payload = payload_builder(

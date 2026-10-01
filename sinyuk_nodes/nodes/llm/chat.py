@@ -95,7 +95,7 @@ class LLMAPINode(io.ComfyNode):
                 io.Combo.Input(
                     "image_detail",
                     options=["auto", "low", "medium", "high", "original"],
-                    default="high",
+                    default="medium",
                     display_name="Image Detail",
                     tooltip="Detail level used when preparing images for the LLM API.",
                     advanced=True,

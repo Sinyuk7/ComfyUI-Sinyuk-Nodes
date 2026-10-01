@@ -1,15 +1,75 @@
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["head_reference", "integration_notes"],
+  "required": ["reference_head", "base_image", "critical_cues"],
   "properties": {
-    "head_reference": {
-      "type": "string",
-      "description": "Concise reliable summary of the target head appearance from Images 2 onward."
+    "reference_head": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["identity_notes", "hair", "makeup"],
+      "properties": {
+        "identity_notes": {
+          "type": "string",
+          "description": "Stable high-level target identity characteristics visible in Image 2 that materially help the replacement. Do not enumerate facial landmarks or biometric measurements. Do not repeat hair or makeup."
+        },
+        "hair": {
+          "type": "string",
+          "description": "Concise target hairline, hairstyle, shape, length, volume, and visible hair characteristics from Image 2."
+        },
+        "makeup": {
+          "type": "string",
+          "description": "Concise visible cosmetic details in Image 2, describing cosmetic type, color family, placement, and deliberate styling. Use neutral reference-grounded wording; omit intensity modifiers unless unmistakable and materially useful. Do not describe skin finish, exposure, skin tone, lighting, or color grading."
+        }
+      }
     },
-    "integration_notes": {
-      "type": "string",
-      "description": "Unusual Image 1 scene conditions that materially affect head integration, such as wind, weather, unusual lighting, motion, occlusion, or atmospheric effects. Empty for ordinary scenes."
+    "base_image": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "head_geometry",
+        "facial_state",
+        "interaction_occlusion",
+        "skin_rendering",
+        "lighting",
+        "color_tone",
+        "environment_effects"
+      ],
+      "properties": {
+        "head_geometry": {
+          "type": "string",
+          "description": "Observable head orientation and local head-to-neck geometry in Image 1, including pitch, yaw, roll, foreshortening, face-plane direction, and neck compression. Do not describe whole-image composition or camera parameters."
+        },
+        "facial_state": {
+          "type": "string",
+          "description": "Observed expressive state of the face in Image 1, including gaze direction, eye openness, brow state, mouth shape and openness, facial tension, and overall visible affect. Describe observable appearance only; do not infer hidden emotions."
+        },
+        "interaction_occlusion": {
+          "type": "string",
+          "description": "Visible spatial relationships between the Image 1 head and nearby objects, including hands, fingers, hair deformation, overlap, occlusion, and contact shadows."
+        },
+        "skin_rendering": {
+          "type": "string",
+          "description": "Image 1 skin rendering such as matte or semi-matte response, specularity, microtexture visibility, local contrast, retouching level, and highlight behavior. Describe rendering, not the original person's identity traits."
+        },
+        "lighting": {
+          "type": "string",
+          "description": "Concise observable Image 1 light direction, softness, falloff, shadow pattern, and highlight distribution on the head."
+        },
+        "color_tone": {
+          "type": "string",
+          "description": "Concise observable Image 1 color and tonal treatment, including skin color rendering, white balance, color cast, saturation, and contrast."
+        },
+        "environment_effects": {
+          "type": "string",
+          "description": "Observable scene effects in Image 1 that directly affect head or hair integration, such as wind, rain, snow, wetness, fog, flare, motion blur, or atmospheric occlusion."
+        }
+      }
+    },
+    "critical_cues": {
+      "type": "array",
+      "maxItems": 3,
+      "items": { "type": "string" },
+      "description": "Zero to three highest-priority observations already captured above that are especially likely to be normalized or lost during replacement. Prioritize skin color, skin rendering, and lighting when they are likely to drift. Do not introduce new information."
     }
   }
 }

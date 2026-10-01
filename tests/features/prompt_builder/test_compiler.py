@@ -314,14 +314,28 @@ def test_template_preset_uses_the_generic_context_builder_chain() -> None:
     prompt = build_prompt(
         json.dumps(
             {
-                "head_reference": "Short dark hair with a side part.",
-                "integration_notes": "Strong warm backlight.",
+                "reference_head": {
+                    "identity_notes": "",
+                    "hair": "Short dark hair with a side part.",
+                    "makeup": "",
+                },
+                "base_image": {
+                    "head_geometry": "",
+                    "facial_state": "",
+                    "interaction_occlusion": "",
+                    "skin_rendering": "",
+                    "lighting": "Strong warm backlight.",
+                    "color_tone": "",
+                    "environment_effects": "",
+                },
+                "critical_cues": [],
             }
         ),
         context=prompt_context,
     )
 
-    assert "Replace the entire visible head" in prompt
+    assert "Replace only the visible head and hair" in prompt
+    assert "Image 2 shows: Short dark hair with a side part." in prompt
     assert "Short dark hair with a side part." in prompt
     assert "Strong warm backlight." in prompt
     assert "soft smile" in prompt

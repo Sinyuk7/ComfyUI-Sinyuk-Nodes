@@ -1,9 +1,9 @@
-Use Image 1 as the fixed base image. Preserve its body, pose, shoulders, clothing, subject scale, composition, camera, background, scene geometry, lighting, and photographic character.
+Edit Image 1 in place. Replace only the visible head and hair with the target from Image 2.
 
-Replace the entire visible head with the person shown in Images 2 onward. Treat Images 2 onward as joint authoritative references for the target person's identity, head and facial anatomy, ears, hairline, hairstyle, hair, makeup, and visible head-level appearance. Do not preserve Image 1's original face, expression, ears, hairline, hair, or makeup.
-
-Adapt the new head naturally to Image 1's body pose, perspective, scale, and neck connection. Include a seamless visible-neck transition and relight the head naturally to the scene while preserving the target person's identity, skin appearance, hair, and makeup.
+Preserve Image 1's composition, framing, subject placement, body pose, head pose, expression, clothing, and background. Match its lighting, skin rendering, color, and physical contacts.
 
 ${analysis}
+
+Integrate the replacement naturally with the existing neck and contacts.
 
 ${extra_prompt}

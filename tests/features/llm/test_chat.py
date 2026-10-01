@@ -112,10 +112,10 @@ def test_image_detail_is_sent_to_each_image() -> None:
     ]
 
 
-def test_medium_image_detail_resizes_long_edge_to_1024() -> None:
+def test_medium_image_detail_resizes_long_edge_to_1280() -> None:
     image = encode_image(torch.zeros((1600, 2400, 3)), detail="medium")
 
-    assert (image.width, image.height) == (1024, 682)
+    assert (image.width, image.height) == (1280, 853)
 
 
 def test_refusal_is_reported_separately_from_malformed_content() -> None:

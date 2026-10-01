@@ -281,12 +281,44 @@ def _render_template_analysis(value: object) -> str:
     if not isinstance(value, dict):
         return ""
     sections: list[str] = []
-    head_reference = value.get("head_reference")
-    if isinstance(head_reference, str) and head_reference.strip():
-        sections.append(f"Target head reference summary: {head_reference.strip()}")
-    integration_notes = value.get("integration_notes")
-    if isinstance(integration_notes, str) and integration_notes.strip():
-        sections.append(f"Image 1 integration notes: {integration_notes.strip()}")
+    critical_cues = value.get("critical_cues")
+    if isinstance(critical_cues, list):
+        cues = [cue.strip() for cue in critical_cues if isinstance(cue, str) and cue.strip()]
+        if cues:
+            sections.append(
+                "Critical cues: " + "; ".join(cue.rstrip(".!?; ") for cue in cues[:3]) + "."
+            )
+    reference_head = value.get("reference_head")
+    if isinstance(reference_head, dict):
+        reference_parts = [
+            str(reference_head[field]).strip()
+            for field in ("identity_notes", "hair", "makeup")
+            if isinstance(reference_head.get(field), str) and reference_head[field].strip()
+        ]
+        if reference_parts:
+            reference_text = "; ".join(reference_parts).rstrip(".!?; ")
+            sections.append(f"Image 2 shows: {reference_text}.")
+    base_image = value.get("base_image")
+    if isinstance(base_image, dict):
+        geometry_labels = {
+            "head_geometry": "head geometry",
+            "facial_state": "facial state",
+            "interaction_occlusion": "interaction and occlusion",
+        }
+        rendering_labels = {
+            "skin_rendering": "skin rendering",
+            "lighting": "lighting",
+            "color_tone": "color tone",
+            "environment_effects": "environmental effects",
+        }
+        for labels in (geometry_labels, rendering_labels):
+            parts = [
+                base_image[field].strip()
+                for field in labels
+                if isinstance(base_image.get(field), str) and base_image[field].strip()
+            ]
+            if parts:
+                sections.append("In Image 1, " + ". ".join(parts).rstrip(".!?; ") + ".")
     return "\n".join(sections)
 
 

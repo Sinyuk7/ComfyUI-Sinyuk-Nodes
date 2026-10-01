@@ -18,6 +18,7 @@ from sinyuk_nodes.registry import ALL_NODES, get_node_list
 def test_registry_is_explicit() -> None:
     assert [node.__name__ for node in ALL_NODES] == [
         "AspectRatioResolutionNode",
+        "ResolutionSelectorAPINode",
         "OpenAPIConfigNode",
         "JSONSchemaNode",
         "PromptContextNode",
@@ -120,6 +121,38 @@ def test_enhancement_context_connects_to_builder() -> None:
     )
     result = PromptBuilderNode.execute(llm_response=analysis, prompt_context=prompt_context)
     assert result.result[0].startswith("Refine the existing outfit")
+
+
+def test_head_replacement_context_connects_to_builder() -> None:
+    import json
+
+    output = PromptContextNode.execute("head.replacement")
+    prompt_context = output.result[3]
+    analysis = json.dumps(
+        {
+            "reference_head": {
+                "identity_notes": "",
+                "hair": "Short dark hair with a side part.",
+                "makeup": "",
+            },
+            "base_image": {
+                "head_geometry": "",
+                "facial_state": "",
+                "interaction_occlusion": "",
+                "skin_rendering": "",
+                "lighting": "Strong warm backlight.",
+                "color_tone": "",
+                "environment_effects": "",
+            },
+            "critical_cues": [],
+        }
+    )
+
+    result = PromptBuilderNode.execute(llm_response=analysis, prompt_context=prompt_context)
+
+    assert result.result[0].startswith("Edit Image 1 in place.")
+    assert "Short dark hair with a side part." in result.result[0]
+    assert "Strong warm backlight." in result.result[0]
 
 
 def test_prompt_builder_requires_llm_response_string_connection() -> None:

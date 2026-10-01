@@ -141,7 +141,7 @@ class PromptBuilderNode(io.ComfyNode):
         prompt_context: PromptContext,
         llm_response: str = "",
     ) -> io.NodeOutput:
-        if prompt_context.compiler_id not in {"garment", "visual"}:
+        if prompt_context.compiler_id not in {"garment", "template", "visual"}:
             raise ValueError(f"Unsupported prompt compiler: {prompt_context.compiler_id}.")
         return io.NodeOutput(build_prompt(llm_response, context=prompt_context))
 

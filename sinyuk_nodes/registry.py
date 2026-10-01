@@ -15,10 +15,12 @@ from .nodes.llm.chat import LLMAPINode
 from .nodes.llm.config import OpenAPIConfigNode
 from .nodes.llm.schema import JSONSchemaNode
 from .nodes.prompt_builder import PromptBuilderNode, PromptContextNode
+from .nodes.resolution_selector_api import ResolutionSelectorAPINode
 
 # Keep registration explicit so the published node surface remains reviewable.
 ALL_NODES: list[type[io.ComfyNode]] = [
     AspectRatioResolutionNode,
+    ResolutionSelectorAPINode,
     OpenAPIConfigNode,
     JSONSchemaNode,
     PromptContextNode,
