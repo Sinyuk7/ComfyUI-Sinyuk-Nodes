@@ -14,11 +14,13 @@ from ...features.image_api.client import GrsaiClient
 from ...features.image_api.config import get_config
 from ...features.image_api.diagnostics import log_event, new_run_id
 from ...features.image_api.errors import clean_message
+from ...features.image_api.generate_runner import GenerateRunner
 from ...features.image_api.images import (
     encode_file_payloads,
     encode_image_files,
     validate_reference_files,
 )
+from ...features.image_api.prompt_expansion import expand_prompts
 from ...features.image_api.request_builder import build_request, build_runninghub_request
 from ...features.image_api.runninghub_client import RunningHubClient
 from ...features.image_api.runninghub_config import get_runninghub_catalog
@@ -65,6 +67,43 @@ class ImageGenerate(io.ComfyNode):
                         "images."
                     ),
                 ),
+                io.Combo.Input(
+                    "generation_mode",
+                    options=["Repeat", "Variants"],
+                    default="Repeat",
+                    display_name="Generation Mode",
+                    tooltip="Repeat the same generation inputs or expand one prompt placeholder.",
+                ),
+                io.Int.Input(
+                    "generation_count",
+                    default=1,
+                    min=1,
+                    max=10,
+                    display_name="Generation Count",
+                    tooltip="Number of independent requests in Repeat mode.",
+                ),
+                io.String.Input(
+                    "placeholder",
+                    default="frame",
+                    display_name="Placeholder",
+                    tooltip="Name used to form the exact [name] placeholder in Variants mode.",
+                ),
+                io.String.Input(
+                    "variants",
+                    optional=True,
+                    force_input=True,
+                    multiline=True,
+                    display_name="Variants",
+                    tooltip="STRING list of complete replacement values for the placeholder.",
+                ),
+                io.Int.Input(
+                    "max_concurrency",
+                    default=4,
+                    min=1,
+                    max=10,
+                    display_name="Max Concurrency",
+                    tooltip="Maximum independent generation requests running at once.",
+                ),
                 io.Image.Input(
                     "images",
                     display_name="Images",
@@ -90,7 +129,13 @@ class ImageGenerate(io.ComfyNode):
                         "Generated images in provider result order. Connect to Preview Image, "
                         "Save Image, or image processing nodes."
                     ),
-                )
+                ),
+                io.String.Output(
+                    "expanded_prompt",
+                    display_name="Expanded Prompt",
+                    is_output_list=True,
+                    tooltip="Final prompt corresponding to each successfully returned image.",
+                ),
             ],
             hidden=[io.Hidden.unique_id, io.Hidden.extra_pnginfo],
             is_input_list=True,
@@ -103,13 +148,31 @@ class ImageGenerate(io.ComfyNode):
 
     @classmethod
     async def execute(
-        cls, api_config=None, model=None, prompt=None, images=None, external_aspect_ratio=None
+        cls,
+        api_config=None,
+        model=None,
+        prompt=None,
+        images=None,
+        external_aspect_ratio=None,
+        generation_mode=None,
+        generation_count=None,
+        placeholder=None,
+        variants=None,
+        max_concurrency=None,
     ):
         from comfy import model_management
 
         from .host import execution_ui
 
         settings, selected, text, parameters = normalize_inputs(api_config, model, prompt)
+        mode = scalar(generation_mode or ["Repeat"], "generation_mode")
+        count = scalar(generation_count or [1], "generation_count")
+        placeholder_name = scalar(placeholder or ["frame"], "placeholder")
+        concurrency = scalar(max_concurrency or [4], "max_concurrency")
+        prompts = expand_prompts(text, mode, count, placeholder_name, variants)
+        task_prompt = next(iter(prompts), None)
+        if task_prompt is None:
+            raise ValueError("At least one generation prompt is required.")
         if external_aspect_ratio is not None:
             if settings.provider != "runninghub":
                 raise ValueError(
@@ -127,6 +190,7 @@ class ImageGenerate(io.ComfyNode):
         log_event("generation.started", run_id=run_id, node_id=node_id, model=selected)
         # Validate cheap fields before encoding potentially large images.
         client = None
+        submitted = False
         ui = execution_ui(cls.hidden, config, settings.token, settings.provider)
         interrupted = False
 
@@ -142,42 +206,95 @@ class ImageGenerate(io.ComfyNode):
             if not files:
                 raise ValueError("Connect 1 to 10 reference images.")
             validate_reference_files(files, enforce_size_limits)
-            if settings.provider == "runninghub":
-                build_runninghub_request(
-                    selected, text, parameters, ["pending"] * len(files), get_runninghub_catalog()
-                )
-                client = RunningHubClient(
+            if len(prompts) > 1:
+                if settings.provider == "runninghub":
+                    build_runninghub_request(
+                        selected,
+                        task_prompt,
+                        parameters,
+                        ["pending"] * len(files),
+                        get_runninghub_catalog(),
+                    )
+                else:
+                    encoded = encode_file_payloads(files, config.transport.image_encoding)
+                    build_request(selected, prompts[0], parameters, encoded, config)
+                runner = GenerateRunner(
                     config,
                     settings.api_key,
+                    prompts,
+                    selected,
+                    parameters,
+                    files,
+                    concurrency,
                     check_cancel,
-                    ui.progress,
-                    endpoint=profile.endpoint,
-                    log_context={"run_id": run_id, "node_id": node_id},
+                    ui.batch_progress,
+                    provider=settings.provider,
+                    endpoint=profile.endpoint
+                    if settings.provider == "runninghub"
+                    else "/v1/api/generate",
                 )
-                urls = await client.upload_images(files)
-                request = build_runninghub_request(
-                    selected, text, parameters, urls, get_runninghub_catalog()
-                )
+                batch = await runner.run()
+                submitted = batch.submitted
+                for failure in batch.failures:
+                    log_event(
+                        "generation.task_failed",
+                        level=logging.WARNING,
+                        run_id=run_id,
+                        node_id=node_id,
+                        task_index=failure.task_index,
+                        task_id=failure.task_id,
+                        error=clean_message(failure.error, (settings.api_key, failure.prompt)),
+                    )
+                if not batch.images:
+                    raise ValueError(
+                        f"All {len(prompts)} generation tasks failed; "
+                        "no valid images were returned."
+                    )
+                result = list(batch.images)
+                result_prompts = list(batch.prompts)
             else:
-                encoded = encode_file_payloads(files, config.transport.image_encoding)
-                request = build_request(selected, text, parameters, encoded, config)
-                client = GrsaiClient(
-                    config,
-                    settings.api_key,
-                    check_cancel,
-                    ui.progress,
-                    log_context={"run_id": run_id, "node_id": node_id},
-                )
-            result = await client.generate(request)
+                if settings.provider == "runninghub":
+                    build_runninghub_request(
+                        selected,
+                        task_prompt,
+                        parameters,
+                        ["pending"] * len(files),
+                        get_runninghub_catalog(),
+                    )
+                    client = RunningHubClient(
+                        config,
+                        settings.api_key,
+                        check_cancel,
+                        ui.progress,
+                        endpoint=profile.endpoint,
+                        log_context={"run_id": run_id, "node_id": node_id},
+                    )
+                    urls = await client.upload_images(files)
+                    request = build_runninghub_request(
+                        selected, task_prompt, parameters, urls, get_runninghub_catalog()
+                    )
+                else:
+                    encoded = encode_file_payloads(files, config.transport.image_encoding)
+                    request = build_request(selected, task_prompt, parameters, encoded, config)
+                    client = GrsaiClient(
+                        config,
+                        settings.api_key,
+                        check_cancel,
+                        ui.progress,
+                        log_context={"run_id": run_id, "node_id": node_id},
+                    )
+                result = await client.generate(request)
+                submitted = client.submitted
+                result_prompts = [task_prompt] * len(result)
             log_event(
                 "generation.succeeded",
                 run_id=run_id,
                 node_id=node_id,
-                task_id=client.task_id,
+                task_id=client.task_id if client else None,
                 outputs=len(result),
                 elapsed_ms=round((time.monotonic() - started) * 1000),
             )
-            return io.NodeOutput(result)
+            return io.NodeOutput(result, result_prompts)
         except (model_management.InterruptProcessingException, asyncio.CancelledError):
             interrupted = True
             await ui.progress("interrupted", None, client.task_id if client else None)
@@ -207,8 +324,7 @@ class ImageGenerate(io.ComfyNode):
         finally:
             # Scheduling failure must never replace the generation result or its original error.
             if (
-                client
-                and client.submitted
+                (client and client.submitted or submitted)
                 and not interrupted
                 and not model_management.processing_interrupted()
             ):
